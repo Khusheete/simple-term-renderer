@@ -2,7 +2,7 @@
 name = "simple-term-renderer"
 version = "0.4.1"
 edition = "2021"
-repository = "https://github.com/Siandfrance/simple-term-renderer"
+repository = "https://github.com/Siandfrance/simple-term-renderer-rs"
 description = "A *linux* terminal renderer library in rust."
 license-file = "LICENSE"
 keywords = [ "graphics", "terminal", "linux", "2d" ]

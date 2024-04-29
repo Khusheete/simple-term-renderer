@@ -46,6 +46,15 @@ impl<A: Clone> Buffer2D<A> {
     }
 
 
+    pub fn get(&self, index: Vec2, default: A) -> A {
+        if !self.is_out_of_range(index) {
+            self[index].clone()
+        } else {
+            default
+        }
+    }
+
+
     fn is_out_of_range(&self, p: Vec2) -> bool {
         p.x < 0 || p.y < 0 || p.x >= self.size.x || p.y >= self.size.y
     }

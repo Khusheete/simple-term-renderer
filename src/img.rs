@@ -283,7 +283,7 @@ impl Image {
         let mut img = RgbImage::new(self.size.x as u32, self.size.y as u32);
         for i in 0..self.size.x {
             for j in 0..self.size.y {
-                let mut pix = img.get_pixel_mut(i as u32, j as u32);
+                let pix = img.get_pixel_mut(i as u32, j as u32);
                 let c = self[vec2!(i, j)];
                 pix.0 = [c.r, c.g, c.b];
             }

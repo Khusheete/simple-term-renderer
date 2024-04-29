@@ -451,6 +451,9 @@ impl Drop for Renderer {
         self.termios.c_cc = self.default_c_cc;
         self.termios.c_lflag = self.default_c_lflags;
 
+        let stdinfd = stdin().as_raw_fd();
+        tcsetattr(stdinfd, TCSANOW, &mut self.termios).expect("could not set stdin attributes");
+
         print!("{}{}",
             csi!("?25h"),                                   // show cursor
             csi!("?1049l")                                  // use main screen buffer

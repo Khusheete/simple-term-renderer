@@ -44,6 +44,7 @@ pub mod input;
 
 
 mod buffer2d;
+mod screen_buffer;
 
 
 #[cfg(test)]

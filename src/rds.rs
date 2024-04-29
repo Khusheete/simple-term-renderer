@@ -30,6 +30,7 @@ extern crate libc;
 use crate::math::Vec2;
 use crate::img::{Image, Color};
 use crate::input::Input;
+use crate::screen_buffer::ScreeBuffer;
 
 use termios::*;
 
@@ -148,8 +149,8 @@ impl Renderer {
 
         let handle = thread::spawn(move || {
             let mut screen_size = Renderer::get_size();
-            let mut screen: Image = Image::new((0, 0));
-            let mut prev_screen: Image = Image::new((0, 0));
+            let mut screen     : ScreeBuffer = ScreeBuffer::new((0, 0));
+            let mut prev_screen: ScreeBuffer = ScreeBuffer::new((0, 0));
 
             let mut back: Color = Color::BLACK;
             let mut fore: Color = Color::BLACK;
@@ -186,28 +187,34 @@ impl Renderer {
                             for i in 0..screen_size.x {
                                 let pos1 = vec2!(i, j);
                                 let pos2 = vec2!(i, j + 1);
+                                
+                                let color1 = screen.get_color(pos1);
+                                let color2 = screen.get_color(pos2);
 
-                                if screen.size() == prev_screen.size() && screen[pos1] == prev_screen[pos1] && screen[pos2] == prev_screen[pos2] {
+                                let prev_color1 = prev_screen.get_color(pos1);
+                                let prev_color2 = prev_screen.get_color(pos2);
+
+                                if screen.size() == prev_screen.size() && color1 == prev_color1 && color2 == prev_color2 {
                                     skiped = true;
                                     continue;
                                 }
                                 
                                 // update color
-                                if screen[pos1] != back && screen[pos1] != fore && screen[pos2] == back {
-                                    fore = screen[pos1];
+                                if color1 != back && color1 != fore && color2 == back {
+                                    fore = color1;
                                     print!("{:+}", fore);
-                                } else if screen[pos1] != back && screen[pos1] != fore && screen[pos2] == fore {
-                                    back = screen[pos1];
+                                } else if color1 != back && color1 != fore && color2 == fore {
+                                    back = color1;
                                     print!("{:-}", back);
-                                } else if screen[pos2] != back && screen[pos2] != fore && screen[pos1] == back {
-                                    fore = screen[pos2];
+                                } else if color2 != back && color2 != fore && color1 == back {
+                                    fore = color2;
                                     print!("{:+}", fore);
-                                } else if screen[pos2] != back && screen[pos2] != fore && screen[pos1] == fore {
-                                    back = screen[pos2];
+                                } else if color2 != back && color2 != fore && color1 == fore {
+                                    back = color2;
                                     print!("{:-}", back);
-                                } else if screen[pos1] != back && screen[pos1] != fore && screen[pos2] != back && screen[pos2] != fore {
-                                    fore = screen[pos1];
-                                    back = screen[pos2];
+                                } else if color1 != back && color1 != fore && color2 != back && color2 != fore {
+                                    fore = color1;
+                                    back = color2;
                                     print!("{:+}", fore);
                                     print!("{:-}", back);
                                 }
@@ -218,13 +225,13 @@ impl Renderer {
                                 }
 
                                 // print pixel
-                                if screen[pos1] == back && screen[pos2] == back {
+                                if color1 == back && color2 == back {
                                     print!(" ");
-                                } else if screen[pos1] == back && screen[pos2] == fore {
+                                } else if color1 == back && color2 == fore {
                                     print!("▄");
-                                } else if screen[pos1] == fore && screen[pos2] == back {
+                                } else if color1 == fore && color2 == back {
                                     print!("▀");
-                                } else if screen[pos1] == fore && screen[pos2] == fore {
+                                } else if color1 == fore && color2 == fore {
                                     print!("█");
                                 }
                             }

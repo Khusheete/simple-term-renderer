@@ -28,7 +28,7 @@
 extern crate libc;
 
 use crate::math::Vec2;
-use crate::img::{Image, Color};
+use crate::img::{BlendMode, Color, Image};
 use crate::input::Input;
 use crate::screen_buffer::*;
 
@@ -233,11 +233,20 @@ impl Renderer {
                                     Some(c) => {
                                         // Get the color that needs to be displayed
                                         let background_color = match char_data.bg_mode {
-                                            CharBackgroundMode::Blend => Color::BLACK,
+                                            CharBackgroundMode::Blend => Color::blend(color1, color2, BlendMode::Add),
                                             CharBackgroundMode::Colored(c) => c
                                         };
                                         let foreground_color = match char_data.fg_mode {
-                                            CharForegroundMode::Opposite => Color::WHITE,
+                                            CharForegroundMode::Opposite => {
+                                                // let (h, s, l) = background_color.get_okhsl();
+                                                // Color::okhsl(1.0 - h, s, 1.0 - l)
+                                                let (_, _, l) = background_color.get_okhsl();
+                                                if l > 0.5 {
+                                                    Color::BLACK
+                                                } else {
+                                                    Color::WHITE
+                                                }
+                                            },
                                             CharForegroundMode::Colored(c) => c
                                         };
 
@@ -502,11 +511,11 @@ impl Renderer {
     }
 
 
-    pub fn print_text_raw<A>(&mut self, text: String, pos: A)
+    pub fn print_text_raw<A>(&mut self, text: &String, pos: A)
         where A: AsRef<Vec2>
     {
         self.can_draw();
-        self.sender.send(RenderingDirective::PrintTextRaw(text, *pos.as_ref())).expect("Rendering thread stoped");
+        self.sender.send(RenderingDirective::PrintTextRaw(text.clone(), *pos.as_ref())).expect("Rendering thread stoped");
     }
 
 

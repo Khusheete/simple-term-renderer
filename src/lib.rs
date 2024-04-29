@@ -33,6 +33,7 @@
 
 extern crate termios;
 extern crate image;
+extern crate palette;
 
 
 #[macro_use]
@@ -52,11 +53,14 @@ mod tests {
 
     use crate::rds::Renderer;
 
-    use crate::math::Vec2;
+    use crate::math::{*};
     use crate::img::*;
     use crate::input::{Input, InputEvent, KeyEvent, MouseEvent};
 
+    use std::f32::consts::TAU;
     use std::sync::{Arc, Mutex};
+    use std::time::{Duration, Instant};
+    use std::thread::sleep;
 
 
     #[test]
@@ -140,14 +144,83 @@ mod tests {
     #[test]
     fn text() {
         let rdr = Renderer::get();
+        let inp = Input::get();
 
-        rdr.begin_draw();
-        rdr.clear_color(Color::BLACK);
-        rdr.print_text_raw(String::from("This text goes a bit off the window"), (-2, 0));
-        rdr.end_draw();
+        let dynamic_text = String::from("Some dynamic text !!!");
+        let dyn_text_char_count = dynamic_text.chars().count();
 
-        // wait for input and exit
-        Input::get().get_event_blocking();
-        Renderer::exit();
+        let mut dyn_text_pos: Vec2f = Vec2f::ZERO;
+        let mut dyn_text_speed: Vec2f = Vec2f::new(TAU * 10.0, 17.0);
+
+        let mut instant = Instant::now();
+        let max_frame_rate: f32 = 60.0;
+        let max_frame_time: f32 = 1.0 / max_frame_rate;
+
+        loop {
+            // Limit frame rate
+            let delta: f32 = instant.elapsed().as_secs_f32();
+            if delta < max_frame_time {
+                sleep(Duration::from_secs_f32(max_frame_time - delta));
+            }
+            let delta: f32 = instant.elapsed().as_secs_f32();
+            instant = Instant::now();
+            
+
+            // Handle input
+            match inp.get_event() {
+                Some(event) => {
+                    match event {
+                        InputEvent::Key(event) => match event {
+                            KeyEvent::Ctrl('c') => Renderer::exit(),
+                            _ => ()
+                        }
+                        _ => ()
+                    }
+                }
+                None => ()
+            };
+
+            // Update text values
+            let size = Vec2f::from(Renderer::get_size());
+            dyn_text_pos += dyn_text_speed * delta;
+            if dyn_text_pos.x <= 1.0 {
+                dyn_text_speed.x = dyn_text_speed.x.abs();
+            }
+            if dyn_text_pos.x >= size.x - dyn_text_char_count as f32 - 1.0 {
+                dyn_text_speed.x = -dyn_text_speed.x.abs();
+            }
+            if dyn_text_pos.y <= 1.0 {
+                dyn_text_speed.y = dyn_text_speed.y.abs();
+            }
+            if dyn_text_pos.y >= size.y - 1.0 {
+                dyn_text_speed.y = -dyn_text_speed.y.abs();
+            }
+
+
+            // Draw frame
+            rdr.begin_draw();
+            rdr.clear(Color::BLACK);
+            rdr.print_text_raw(&format!("Time delta: {}", delta), (1, 15));
+
+            rdr.print_text_raw(&String::from("This text goes a bit off the window"), (-2, 0));
+
+            rdr.draw_rect((3, 5), (2, 6), Color::LIGHT_BLUE);
+            rdr.draw_rect((7, 3), (2, 6), Color::LIGHT_BLUE);
+            rdr.draw_rect((10, 3), (2, 6), Color::WHITE);
+            rdr.draw_rect((12, 3), (2, 6), Color::RED);
+            rdr.draw_rect((14, 3), (2, 6), Color::GREEN);
+            rdr.draw_rect((16, 3), (2, 6), Color::BLUE);
+            rdr.draw_rect((18, 3), (2, 6), Color::GRAY);
+            rdr.draw_rect((20, 3), (2, 6), Color::DARK_KHAKI);
+            rdr.draw_rect((22, 3), (2, 6), Color::CADET_BLUE);
+            rdr.draw_rect((24, 3), (2, 6), Color::PINK);
+            rdr.draw_rect((26, 3), (2, 6), Color::PURPLE);
+            rdr.draw_rect((28, 3), (2, 6), Color::GAINSBORO);
+            rdr.print_text_raw(&String::from("I can draw text that will automagically change color to be readable"), (0, 4));
+
+            rdr.draw_rect((20, 20), (49, 7), Color::DARK_RED);
+            rdr.print_text_raw(&dynamic_text, Vec2::from(dyn_text_pos));
+            rdr.end_draw();
+        }
     }
 }

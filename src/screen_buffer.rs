@@ -51,9 +51,11 @@ impl ScreeBuffer {
     pub fn new<V>(size: V) -> Self
         where V: AsRef<Vec2>
     {
+        let mut text_size = *size.as_ref();
+        text_size.y /= 2;
         Self {
             image: Image::new(*size.as_ref()),
-            text : Buffer2D::new(*size.as_ref() / 2, CharData::default())
+            text : Buffer2D::new(text_size / 2, CharData::default())
         }
     }
 
@@ -73,8 +75,10 @@ impl ScreeBuffer {
     pub fn raw_resize<V>(&mut self, new_size: V) 
         where V: AsRef<Vec2>
     {
+        let mut text_size = *new_size.as_ref();
+        text_size.y /= 2;
         self.image.raw_resize(*new_size.as_ref());
-        self.text.raw_resize(*new_size.as_ref() / 2, CharData::default());
+        self.text.raw_resize(text_size, CharData::default());
     }
 
 
@@ -165,10 +169,11 @@ impl ScreeBuffer {
         for (i, c) in char_iter {
             let x = pos.x + (i as i32);
             let char_pos = vec2!(x, pos.y);
+
             if x < 0 {
                 continue
             }
-            if x >= self.size().x {
+            if x >= self.text.size().x {
                 return // We are now sure that the full text will go offscreen
                 // so we skip drawing everything
             }

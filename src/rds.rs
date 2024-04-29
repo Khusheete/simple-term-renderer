@@ -148,8 +148,8 @@ impl Renderer {
 
         let handle = thread::spawn(move || {
             let mut screen_size = Renderer::get_size();
-            let mut screen: Image = Image::new(0, 0);
-            let mut prev_screen: Image = Image::new(0, 0);
+            let mut screen: Image = Image::new((0, 0));
+            let mut prev_screen: Image = Image::new((0, 0));
 
             let mut back: Color = Color::BLACK;
             let mut fore: Color = Color::BLACK;

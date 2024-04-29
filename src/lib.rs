@@ -43,6 +43,7 @@ pub mod rds;
 pub mod input;
 
 
+mod buffer2d;
 
 
 #[cfg(test)]

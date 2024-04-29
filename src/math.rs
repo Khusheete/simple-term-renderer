@@ -29,7 +29,7 @@ use std::ops::{Add, Sub, AddAssign, SubAssign, Mul, MulAssign, Div, DivAssign};
 
 #[macro_export]
 macro_rules! vec2 {
-    ($x:expr, $y:expr) => {Vec2::new($x, $y)};
+    ($x:expr, $y:expr) => {Vec2::new($x as i32, $y as i32)};
 }
 
 

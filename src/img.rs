@@ -26,7 +26,7 @@
 
 
 use crate::buffer2d::Buffer2D;
-use crate::math::Vec2;
+use crate::math::{Vec2, Vec3f};
 
 use std::ops::{Index, IndexMut};
 use std::fmt;
@@ -35,6 +35,14 @@ use std::path::Path;
 
 use image::io::Reader as ImageReader;
 use image::{Pixel, RgbImage};
+use palette::{LinSrgb, Okhsl, Srgb};
+use palette::convert::FromColor;
+
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BlendMode {
+    Add
+}
 
 
 /// RGB Color struct.
@@ -221,6 +229,55 @@ impl Color {
             b: ((h & 0x000000FF) / 0x00000001) as u8
         }
     }
+
+
+    pub fn raw_rgb(r: f32, g: f32, b: f32) -> Self {
+        Self {
+            r: (r * 255.0).clamp(0.0, 255.0) as u8,
+            g: (g * 255.0).clamp(0.0, 255.0) as u8,
+            b: (b * 255.0).clamp(0.0, 255.0) as u8
+        }
+    }
+
+
+    pub fn raw_vec3_rgb(c: Vec3f) -> Self {
+        Self::raw_rgb(c.x, c.y, c.z)
+    }
+
+
+    pub fn okhsl(h: f32, s: f32, l: f32) -> Self {
+        let okhsl = Okhsl::new(h, s, l);
+        let srgb = Srgb::from_color(okhsl);
+        let rgb = srgb.into_linear();
+        Self::raw_rgb(rgb.red, rgb.green, rgb.blue)
+    }
+
+
+    pub fn get_raw(&self) -> (f32, f32, f32) {
+        (self.r as f32 / 255.0, self.g as f32 / 255.0, self.b as f32 / 255.0)
+    }
+
+
+    pub fn get_raw_vec3f(&self) -> Vec3f {
+        let (r, g, b) = self.get_raw();
+        Vec3f::new(r, g, b)
+    }
+
+
+    pub fn get_okhsl(&self) -> (f32, f32, f32) {
+        let (r, g, b) = self.get_raw();
+        let okhsl: Okhsl = Okhsl::from_color(LinSrgb::new(r, g, b));
+        (okhsl.hue.into_inner(), okhsl.saturation, okhsl.lightness)
+    }
+
+
+    pub fn blend(a: Color, b: Color, mode: BlendMode) -> Self {
+        match mode {
+            BlendMode::Add => {
+                Self::raw_vec3_rgb((a.get_raw_vec3f() + b.get_raw_vec3f()) / 2.0)
+            }
+        }
+    }
 }
 
 
@@ -228,6 +285,7 @@ impl fmt::Display for Color {
 
     /// Writes the CSI to set background or color (respectively when using {:-} or {:+}) to `f`.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // We don't need to do any transformation as the terminal's color space is RGB (and not sRGB)
         if f.sign_minus() {
             write!(f, "\x1b[48;2;{};{};{}m", self.r, self.g, self.b)
         } else {

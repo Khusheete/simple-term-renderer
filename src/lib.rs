@@ -129,10 +129,25 @@ mod tests {
 
             // draw on screen
             rdr.begin_draw();
-            rdr.clear_screen(Color::BLACK);
+            rdr.clear_color(Color::BLACK);
             rdr.draw_rect_boundary(Vec2::ZERO, size - vec2!(1, 1), Color::BROWN);
             rdr.draw_point(pos, Color::WHITE);
             rdr.end_draw();
         }
+    }
+
+
+    #[test]
+    fn text() {
+        let rdr = Renderer::get();
+
+        rdr.begin_draw();
+        rdr.clear_color(Color::BLACK);
+        rdr.print_text_raw(String::from("This text goes a bit off the window"), (-2, 0));
+        rdr.end_draw();
+
+        // wait for input and exit
+        Input::get().get_event_blocking();
+        Renderer::exit();
     }
 }

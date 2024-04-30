@@ -25,7 +25,8 @@
 */
 
 
-use crate::math::Vec2;
+use crate::buffer2d::Buffer2D;
+use crate::math::{Vec2, Vec3f};
 
 use std::ops::{Index, IndexMut};
 use std::fmt;
@@ -34,6 +35,14 @@ use std::path::Path;
 
 use image::io::Reader as ImageReader;
 use image::{Pixel, RgbImage};
+use palette::{LinSrgb, Okhsl, Srgb};
+use palette::convert::FromColor;
+
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BlendMode {
+    Add
+}
 
 
 /// RGB Color struct.
@@ -220,6 +229,55 @@ impl Color {
             b: ((h & 0x000000FF) / 0x00000001) as u8
         }
     }
+
+
+    pub fn raw_rgb(r: f32, g: f32, b: f32) -> Self {
+        Self {
+            r: (r * 255.0).clamp(0.0, 255.0) as u8,
+            g: (g * 255.0).clamp(0.0, 255.0) as u8,
+            b: (b * 255.0).clamp(0.0, 255.0) as u8
+        }
+    }
+
+
+    pub fn raw_vec3_rgb(c: Vec3f) -> Self {
+        Self::raw_rgb(c.x, c.y, c.z)
+    }
+
+
+    pub fn okhsl(h: f32, s: f32, l: f32) -> Self {
+        let okhsl = Okhsl::new(h, s, l);
+        let srgb = Srgb::from_color(okhsl);
+        let rgb = srgb.into_linear();
+        Self::raw_rgb(rgb.red, rgb.green, rgb.blue)
+    }
+
+
+    pub fn get_raw(&self) -> (f32, f32, f32) {
+        (self.r as f32 / 255.0, self.g as f32 / 255.0, self.b as f32 / 255.0)
+    }
+
+
+    pub fn get_raw_vec3f(&self) -> Vec3f {
+        let (r, g, b) = self.get_raw();
+        Vec3f::new(r, g, b)
+    }
+
+
+    pub fn get_okhsl(&self) -> (f32, f32, f32) {
+        let (r, g, b) = self.get_raw();
+        let okhsl: Okhsl = Okhsl::from_color(LinSrgb::new(r, g, b));
+        (okhsl.hue.into_inner(), okhsl.saturation, okhsl.lightness)
+    }
+
+
+    pub fn blend(a: Color, b: Color, mode: BlendMode) -> Self {
+        match mode {
+            BlendMode::Add => {
+                Self::raw_vec3_rgb((a.get_raw_vec3f() + b.get_raw_vec3f()) / 2.0)
+            }
+        }
+    }
 }
 
 
@@ -227,6 +285,7 @@ impl fmt::Display for Color {
 
     /// Writes the CSI to set background or color (respectively when using {:-} or {:+}) to `f`.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // We don't need to do any transformation as the terminal's color space is RGB (and not sRGB)
         if f.sign_minus() {
             write!(f, "\x1b[48;2;{};{};{}m", self.r, self.g, self.b)
         } else {
@@ -240,18 +299,18 @@ impl fmt::Display for Color {
 /// Image struct. This is a Color buffer.
 /// Pixels can be accessed by indexing with the pixel coordinates.
 pub struct Image {
-    data: Vec<Color>,
-    size: Vec2
+    data: Buffer2D<Color>
 }
 
 
 impl Image {
 
     /// Creates an image of size (`w`, `h`). All the pixels are set to black.
-    pub fn new(w: usize, h: usize) -> Self {
+    pub fn new<V>(size: V) -> Self
+        where V: AsRef<Vec2>
+    {
         Self {
-            data: vec![Color::BLACK; w * h],
-            size: vec2!(w as i32, h as i32)
+            data: Buffer2D::new(*size.as_ref(), Color::BLACK)
         }
     }
 
@@ -266,7 +325,7 @@ impl Image {
             }
             Err(e) => return Err(format!("{}", e))
         }.to_rgb8();
-        let mut result = Image::new(img.width() as usize, img.height() as usize);
+        let mut result = Image::new(vec2!(img.width(), img.height()));
         for i in 0..img.width() {
             for j in 0..img.height() {
                 let px = img.get_pixel(i, j).channels();
@@ -280,10 +339,10 @@ impl Image {
     /// Saves an image to a file.
     pub fn save<P>(&self, path: P) -> Result<(), String>
             where P: AsRef<Path> {
-        let mut img = RgbImage::new(self.size.x as u32, self.size.y as u32);
-        for i in 0..self.size.x {
-            for j in 0..self.size.y {
-                let mut pix = img.get_pixel_mut(i as u32, j as u32);
+        let mut img = RgbImage::new(self.size().x as u32, self.size().y as u32);
+        for i in 0..self.size().x {
+            for j in 0..self.size().y {
+                let pix = img.get_pixel_mut(i as u32, j as u32);
                 let c = self[vec2!(i, j)];
                 pix.0 = [c.r, c.g, c.b];
             }
@@ -298,7 +357,7 @@ impl Image {
 
     /// Returns the size of the image.
     pub fn size(&self) -> Vec2 {
-        self.size
+        self.data.size()
     }
 
 
@@ -307,28 +366,15 @@ impl Image {
     pub fn raw_resize<A>(&mut self, new_size: A) 
         where A: AsRef<Vec2>
     {
-        self.size = *new_size.as_ref();
-        self.data.resize((self.size.x * self.size.y) as usize, Color::BLACK);
-        self.data.shrink_to_fit();
+        self.data.raw_resize(*new_size.as_ref(), Color::BLACK);
     }
 
 
-    /// Resizes the image keeping the top left part of the image
+    /// NOT IMPLEMENTED Resizes the image keeping the top left part of the image
     pub fn resize<A>(&mut self, new_size: A) 
         where A: AsRef<Vec2>
     {
-        // TOFIX: buffer overflow
-        let new_size = new_size.as_ref();
-        if new_size.x != self.size.x {
-            let mut cnt: usize = new_size.x as usize;
-            for j in 1..new_size.y {
-                for i in 0..new_size.x {
-                    self.data[cnt] = self[(i, j)];
-                    cnt += 1;
-                }
-            }
-        }
-        self.raw_resize(new_size);
+        self.data.resize(*new_size.as_ref(), Color::BLACK);
     }
 
 
@@ -336,7 +382,7 @@ impl Image {
         where A: AsRef<Vec2> 
     {
         let p = p.as_ref();
-        p.x < 0 || p.y < 0 || p.x >= self.size.x || p.y >= self.size.y
+        p.x < 0 || p.y < 0 || p.x >= self.size().x || p.y >= self.size().y
     }
 
 
@@ -365,8 +411,8 @@ impl Image {
         self[p1] = c;
 
         while (p1.x != p2.x || p1.y != p2.y)
-             && ((p1.x < self.size.x && sx > 0) || (p1.x >= 0 && sx < 0))
-             && ((p1.y < self.size.y && sy > 0) || (p1.y >= 0 && sy < 0))
+             && ((p1.x < self.size().x && sx > 0) || (p1.x >= 0 && sx < 0))
+             && ((p1.y < self.size().y && sy > 0) || (p1.y >= 0 && sy < 0))
         {
             let e2 = 2 * err;
             if e2 >= dy {
@@ -418,10 +464,10 @@ impl Image {
 
         for j in 0..(s.y.abs()) {
             let y = p.y + j * dy;
-            if y >= self.size.y {break}
+            if y >= self.size().y {break}
             for i in 0..(s.x.abs()) {
                 let x = p.x + i * dx;
-                if x >= self.size.x {break}
+                if x >= self.size().x {break}
 
                 self[(x, y)] = c;
             }
@@ -431,9 +477,7 @@ impl Image {
 
     /// Sets all the pixels' color in the screen to `c`.
     pub fn clear(&mut self, c: Color) {
-        for i in 0..self.data.len() {
-            self.data[i] = c;
-        }
+        self.data.fill(c);
     }
 
 
@@ -537,13 +581,13 @@ impl Image {
         for j in 0..(s.y.abs()) {
             let y = p.y + j * dy;
             let src_y = offset.y + j;
-            if y >= self.size.y {break}
-            if src_y >= img.size.y {break}
+            if y >= self.size().y {break}
+            if src_y >= img.size().y {break}
             for i in 0..(s.x.abs()) {
                 let x = p.x + i * dx;
                 let src_x = offset.x + i;
-                if x >= self.size.x {break}
-                if src_x >= img.size.x {break}
+                if x >= self.size().x {break}
+                if src_x >= img.size().x {break}
 
                 let pos = vec2!(x, y);
                 let src_pos = vec2!(src_x, src_y);
@@ -590,9 +634,9 @@ impl<A: AsRef<Vec2>> Index<A> for Image {
     type Output = Color;
 
     fn index(&self, p: A) -> &Self::Output {
-        let p = p.as_ref();
+        let p = *p.as_ref();
         if !self.is_out_of_range(p) {
-            &self.data[(p.x + p.y * self.size.x) as usize]
+            &self.data[p]
         } else {
             &Color::BLACK
         }
@@ -604,10 +648,10 @@ impl<A: AsRef<Vec2>> IndexMut<A> for Image {
 
     fn index_mut(&mut self, p: A) -> &mut Self::Output {
         static mut TEMP: Color = Color::BLACK;
-        let p = p.as_ref();
+        let p = *p.as_ref();
 
         if !self.is_out_of_range(p) {
-            &mut self.data[(p.x + p.y * self.size.x) as usize]
+            &mut self.data[p]
         } else {
             unsafe { &mut TEMP } // NOT GOOD, ignore index out of range
         }

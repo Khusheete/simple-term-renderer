@@ -28,14 +28,18 @@
 extern crate libc;
 
 use crate::math::Vec2;
-use crate::img::{Image, Color};
+use crate::img::{BlendMode, Color, Image};
 use crate::input::Input;
+use crate::screen_buffer::*;
 
 use termios::*;
 
 use std::mem;
 
 use std::io::{stdout, Write};
+
+use std::panic;
+use std::backtrace::Backtrace;
 
 use std::thread;
 use std::sync::{mpsc, Barrier, Arc, Mutex};
@@ -64,7 +68,10 @@ enum RenderingDirective {
     DrawWholeImageAlpha(Arc<Mutex<Image>>, Vec2, Color),
     DrawWholeImage(Arc<Mutex<Image>>, Vec2),
 
-    ClearScreen(Color),
+    PrintTextRaw(String, Vec2, CharBackgroundMode, CharForegroundMode),
+
+    ClearColor(Color),
+    ClearText,
 
     UpdateScreenSize(Vec2),
     BeginFrame,
@@ -141,6 +148,14 @@ impl Renderer {
         );
         stdout().flush().expect("Could not write to stdout"); 
 
+        // Exit when panicking + print backtrace
+        panic::set_hook(Box::new(|panic_info| {
+            let backtrace = Backtrace::capture();
+            eprintln!("{}", backtrace);
+            eprintln!("{}", panic_info);
+            Renderer::exit();
+        }));
+
         // setup and start server
         let (rx, tx) = mpsc::channel();
         let barrier = Arc::new(Barrier::new(2));
@@ -148,8 +163,8 @@ impl Renderer {
 
         let handle = thread::spawn(move || {
             let mut screen_size = Renderer::get_size();
-            let mut screen: Image = Image::new(0, 0);
-            let mut prev_screen: Image = Image::new(0, 0);
+            let mut screen     : ScreeBuffer = ScreeBuffer::new((0, 0));
+            let mut prev_screen: ScreeBuffer = ScreeBuffer::new((0, 0));
 
             let mut back: Color = Color::BLACK;
             let mut fore: Color = Color::BLACK;
@@ -168,7 +183,10 @@ impl Renderer {
                     RenderingDirective::DrawWholeImageAlpha(img, pos, alpha) => screen.whole_image_alpha(&(*img.lock().unwrap()), pos, alpha),
                     RenderingDirective::DrawWholeImage(img, pos) => screen.whole_image(&(*img.lock().unwrap()), pos),
 
-                    RenderingDirective::ClearScreen(c) => screen.clear(c),
+                    RenderingDirective::PrintTextRaw(text, pos, back_mode, fore_mode) => screen.print_text_raw(text, pos, back_mode, fore_mode),
+
+                    RenderingDirective::ClearColor(c) => screen.clear_color(c),
+                    RenderingDirective::ClearText => screen.clear_text(),
 
                     RenderingDirective::UpdateScreenSize(size) => {
                         screen_size = size;
@@ -187,45 +205,98 @@ impl Renderer {
                                 let pos1 = vec2!(i, j);
                                 let pos2 = vec2!(i, j + 1);
 
-                                if screen.size() == prev_screen.size() && screen[pos1] == prev_screen[pos1] && screen[pos2] == prev_screen[pos2] {
+                                let color1 = screen.get_color(pos1);
+                                let color2 = screen.get_color(pos2);
+                                let char_data = screen.get_char_data(pos1);
+
+                                let prev_color1 = prev_screen.get_color(pos1);
+                                let prev_color2 = prev_screen.get_color(pos2);
+                                let prev_char_data = prev_screen.get_char_data(pos1);
+                                
+                                // Can this pixel be skipped ?
+                                if screen.size() == prev_screen.size()
+                                        && char_data == prev_char_data
+                                        && color1 == prev_color1
+                                        && color2 == prev_color2 {
                                     skiped = true;
                                     continue;
                                 }
-                                
-                                // update color
-                                if screen[pos1] != back && screen[pos1] != fore && screen[pos2] == back {
-                                    fore = screen[pos1];
-                                    print!("{:+}", fore);
-                                } else if screen[pos1] != back && screen[pos1] != fore && screen[pos2] == fore {
-                                    back = screen[pos1];
-                                    print!("{:-}", back);
-                                } else if screen[pos2] != back && screen[pos2] != fore && screen[pos1] == back {
-                                    fore = screen[pos2];
-                                    print!("{:+}", fore);
-                                } else if screen[pos2] != back && screen[pos2] != fore && screen[pos1] == fore {
-                                    back = screen[pos2];
-                                    print!("{:-}", back);
-                                } else if screen[pos1] != back && screen[pos1] != fore && screen[pos2] != back && screen[pos2] != fore {
-                                    fore = screen[pos1];
-                                    back = screen[pos2];
-                                    print!("{:+}", fore);
-                                    print!("{:-}", back);
-                                }
 
+                                // If the previous pixel was a skip, go to the current pixel
                                 if skiped {
                                     print!("\x1b[{};{}H", j/2 + 1, i + 1);
                                     skiped = false;
                                 }
 
-                                // print pixel
-                                if screen[pos1] == back && screen[pos2] == back {
-                                    print!(" ");
-                                } else if screen[pos1] == back && screen[pos2] == fore {
-                                    print!("▄");
-                                } else if screen[pos1] == fore && screen[pos2] == back {
-                                    print!("▀");
-                                } else if screen[pos1] == fore && screen[pos2] == fore {
-                                    print!("█");
+
+                                match char_data.c {
+                                    Some(c) => {
+                                        // Get the color that needs to be displayed
+                                        let background_color = match char_data.bg_mode {
+                                            CharBackgroundMode::Blend => Color::blend(color1, color2, BlendMode::Add),
+                                            CharBackgroundMode::Colored(c) => c
+                                        };
+                                        let foreground_color = match char_data.fg_mode {
+                                            CharForegroundMode::Opposite => {
+                                                // let (h, s, l) = background_color.get_okhsl();
+                                                // Color::okhsl(1.0 - h, s, 1.0 - l)
+                                                let (_, _, l) = background_color.get_okhsl();
+                                                if l > 0.5 {
+                                                    Color::BLACK
+                                                } else {
+                                                    Color::WHITE
+                                                }
+                                            },
+                                            CharForegroundMode::Colored(c) => c
+                                        };
+
+                                        // Update foreground and background color
+                                        if back != background_color {
+                                            back = background_color;
+                                            print!("{:-}", back);
+                                        }
+                                        if fore != foreground_color {
+                                            fore = foreground_color;
+                                            print!("{:+}", fore);
+                                        }
+                                        
+                                        // Print the character
+                                        print!("{}", c);
+                                    }
+                                    None => {
+                                        
+                                
+                                        // update color
+                                        if color1 != back && color1 != fore && color2 == back {
+                                            fore = color1;
+                                            print!("{:+}", fore);
+                                        } else if color1 != back && color1 != fore && color2 == fore {
+                                            back = color1;
+                                            print!("{:-}", back);
+                                        } else if color2 != back && color2 != fore && color1 == back {
+                                            fore = color2;
+                                            print!("{:+}", fore);
+                                        } else if color2 != back && color2 != fore && color1 == fore {
+                                            back = color2;
+                                            print!("{:-}", back);
+                                        } else if color1 != back && color1 != fore && color2 != back && color2 != fore {
+                                            fore = color1;
+                                            back = color2;
+                                            print!("{:+}", fore);
+                                            print!("{:-}", back);
+                                        }
+
+                                        // print pixel
+                                        if color1 == back && color2 == back {
+                                            print!(" ");
+                                        } else if color1 == back && color2 == fore {
+                                            print!("▄");
+                                        } else if color1 == fore && color2 == back {
+                                            print!("▀");
+                                        } else if color1 == fore && color2 == fore {
+                                            print!("█");
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -306,11 +377,11 @@ impl Renderer {
         self.building_frame = true;
         let new_size = Renderer::get_size();
         if self.prev_screen_size != new_size {
-            self.sender.send(RenderingDirective::UpdateScreenSize(new_size)).expect("Rendering thread stoped");
+            self.sender.send(RenderingDirective::UpdateScreenSize(new_size)).expect("Rendering thread stopped");
             self.prev_screen_size = new_size;
         }
 
-        self.sender.send(RenderingDirective::BeginFrame).expect("Rendering thread stoped");
+        self.sender.send(RenderingDirective::BeginFrame).expect("Rendering thread stopped");
         self.frame_barrier.wait();
     }
 
@@ -321,14 +392,29 @@ impl Renderer {
             panic!("end_draw called when already building a frame");
         }
         self.building_frame = false;
-        self.sender.send(RenderingDirective::PushFrame).expect("Rendering thread stoped");
+        self.sender.send(RenderingDirective::PushFrame).expect("Rendering thread stopped");
     }
 
 
-    /// Sets all the pixels' color in the screen to `c`.
-    pub fn clear_screen(&mut self, c: Color) {
+    /// Clears the screen (color and text).
+    pub fn clear(&mut self, c: Color) {
         self.can_draw();
-        self.sender.send(RenderingDirective::ClearScreen(c)).expect("Rendering thread stoped");
+        self.sender.send(RenderingDirective::ClearColor(c)).expect("Rendering thread stopped");
+        self.sender.send(RenderingDirective::ClearText).expect("Rendering thread stopped");
+    }
+
+
+    /// Sets all the pixels' color in the screen to `c` (does not clear text).
+    pub fn clear_color(&mut self, c: Color) {
+        self.can_draw();
+        self.sender.send(RenderingDirective::ClearColor(c)).expect("Rendering thread stopped");
+    }
+
+
+    /// Removes all text from the screen.
+    pub fn clear_text(&mut self) {
+        self.can_draw();
+        self.sender.send(RenderingDirective::ClearText).expect("Rendering thread stopped");
     }
 
 
@@ -338,7 +424,7 @@ impl Renderer {
     {
         self.can_draw();
         self.sender.send(RenderingDirective::DrawLine(*p1.as_ref(), *p2.as_ref(), c))
-            .expect("Rendering thread stoped");
+            .expect("Rendering thread stopped");
     }
 
 
@@ -349,7 +435,7 @@ impl Renderer {
     {
         self.can_draw();
         self.sender.send(RenderingDirective::DrawRect(*p.as_ref(), *s.as_ref(), c))
-            .expect("Rendering thread stoped");
+            .expect("Rendering thread stopped");
     }
 
 
@@ -359,7 +445,7 @@ impl Renderer {
     {
         self.can_draw();
         self.sender.send(RenderingDirective::DrawRectBoudary(*p.as_ref(), *s.as_ref(), c))
-            .expect("Rendering thread stoped");
+            .expect("Rendering thread stopped");
     }
 
 
@@ -370,7 +456,7 @@ impl Renderer {
     {
         self.can_draw();
         self.sender.send(RenderingDirective::DrawEllipseBoudary(*c.as_ref(), *s.as_ref(), col))
-            .expect("Rendering thread stoped");
+            .expect("Rendering thread stopped");
     }
 
 
@@ -379,7 +465,7 @@ impl Renderer {
         where A: AsRef<Vec2>
     {
         self.can_draw();
-        self.sender.send(RenderingDirective::DrawPoint(*p.as_ref(), c)).expect("Rendering thread stoped");
+        self.sender.send(RenderingDirective::DrawPoint(*p.as_ref(), c)).expect("Rendering thread stopped");
     }
 
 
@@ -392,7 +478,7 @@ impl Renderer {
     {
         self.can_draw();
         self.sender.send(RenderingDirective::DrawImage(img, *pos.as_ref(), *size.as_ref(), *offset.as_ref(), alpha))
-            .expect("Rendering thread stoped");
+            .expect("Rendering thread stopped");
     }
 
 
@@ -407,7 +493,7 @@ impl Renderer {
     {
         self.can_draw();
         self.sender.send(RenderingDirective::DrawWholeImageAlpha(img, *pos.as_ref(), alpha))
-            .expect("Rendering thread stoped");
+            .expect("Rendering thread stopped");
     }
 
 
@@ -421,7 +507,40 @@ impl Renderer {
         where A: AsRef<Vec2>
     {
         self.can_draw();
-        self.sender.send(RenderingDirective::DrawWholeImage(img, *pos.as_ref())).expect("Rendering thread stoped");
+        self.sender.send(RenderingDirective::DrawWholeImage(img, *pos.as_ref())).expect("Rendering thread stopped");
+    }
+
+
+    pub fn print_text_raw<A>(&mut self, text: &String, pos: A, background_mode: CharBackgroundMode, foreground_mode: CharForegroundMode)
+        where A: AsRef<Vec2>
+    {
+        self.can_draw();
+        self.sender.send(RenderingDirective::PrintTextRaw(text.clone(), *pos.as_ref(), background_mode, foreground_mode))
+            .expect("Rendering thread stopped");
+    }
+
+
+    pub fn print_blended_text_raw<A>(&mut self, text: &String, pos: A)
+        where A: AsRef<Vec2>
+    {
+        self.print_text_raw(
+            text,
+            pos,
+            CharBackgroundMode::Blend,
+            CharForegroundMode::Opposite
+        );
+    }
+
+
+    pub fn print_colored_text_raw<A>(&mut self, text: &String, pos: A, background_color: Color, foreground_color: Color)
+        where A: AsRef<Vec2>
+    {
+        self.print_text_raw(
+            text,
+            pos,
+            CharBackgroundMode::Colored(background_color),
+            CharForegroundMode::Colored(foreground_color)
+        )
     }
 
 
@@ -443,6 +562,9 @@ impl Drop for Renderer {
         // return settings to default
         self.termios.c_cc = self.default_c_cc;
         self.termios.c_lflag = self.default_c_lflags;
+
+        let stdinfd = stdin().as_raw_fd();
+        tcsetattr(stdinfd, TCSANOW, &mut self.termios).expect("could not set stdin attributes");
 
         print!("{}{}",
             csi!("?25h"),                                   // show cursor

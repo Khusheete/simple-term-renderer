@@ -68,7 +68,7 @@ enum RenderingDirective {
     DrawWholeImageAlpha(Arc<Mutex<Image>>, Vec2, Color),
     DrawWholeImage(Arc<Mutex<Image>>, Vec2),
 
-    PrintTextRaw(String, Vec2),
+    PrintTextRaw(String, Vec2, CharBackgroundMode, CharForegroundMode),
 
     ClearColor(Color),
     ClearText,
@@ -183,7 +183,7 @@ impl Renderer {
                     RenderingDirective::DrawWholeImageAlpha(img, pos, alpha) => screen.whole_image_alpha(&(*img.lock().unwrap()), pos, alpha),
                     RenderingDirective::DrawWholeImage(img, pos) => screen.whole_image(&(*img.lock().unwrap()), pos),
 
-                    RenderingDirective::PrintTextRaw(text, pos) => screen.print_text_raw(text, pos),
+                    RenderingDirective::PrintTextRaw(text, pos, back_mode, fore_mode) => screen.print_text_raw(text, pos, back_mode, fore_mode),
 
                     RenderingDirective::ClearColor(c) => screen.clear_color(c),
                     RenderingDirective::ClearText => screen.clear_text(),
@@ -511,11 +511,36 @@ impl Renderer {
     }
 
 
-    pub fn print_text_raw<A>(&mut self, text: &String, pos: A)
+    pub fn print_text_raw<A>(&mut self, text: &String, pos: A, background_mode: CharBackgroundMode, foreground_mode: CharForegroundMode)
         where A: AsRef<Vec2>
     {
         self.can_draw();
-        self.sender.send(RenderingDirective::PrintTextRaw(text.clone(), *pos.as_ref())).expect("Rendering thread stopped");
+        self.sender.send(RenderingDirective::PrintTextRaw(text.clone(), *pos.as_ref(), background_mode, foreground_mode))
+            .expect("Rendering thread stopped");
+    }
+
+
+    pub fn print_blended_text_raw<A>(&mut self, text: &String, pos: A)
+        where A: AsRef<Vec2>
+    {
+        self.print_text_raw(
+            text,
+            pos,
+            CharBackgroundMode::Blend,
+            CharForegroundMode::Opposite
+        );
+    }
+
+
+    pub fn print_colored_text_raw<A>(&mut self, text: &String, pos: A, background_color: Color, foreground_color: Color)
+        where A: AsRef<Vec2>
+    {
+        self.print_text_raw(
+            text,
+            pos,
+            CharBackgroundMode::Colored(background_color),
+            CharForegroundMode::Colored(foreground_color)
+        )
     }
 
 

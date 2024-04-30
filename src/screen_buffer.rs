@@ -148,7 +148,7 @@ impl ScreeBuffer {
     }
 
 
-    pub fn print_text_raw<V>(&mut self, text: String, pos: V)
+    pub fn print_text_raw<V>(&mut self, text: String, pos: V, backgroud_mode: CharBackgroundMode, foreground_mode: CharForegroundMode)
         where V: AsRef<Vec2>
     {
         let mut pos: Vec2 = *pos.as_ref();
@@ -180,8 +180,8 @@ impl ScreeBuffer {
 
             // Add the character to the text buffer
             self.text[char_pos].c = Some(c);
-            self.text[char_pos].bg_mode = CharBackgroundMode::Blend;
-            self.text[char_pos].fg_mode = CharForegroundMode::Opposite;
+            self.text[char_pos].bg_mode = backgroud_mode;
+            self.text[char_pos].fg_mode = foreground_mode;
         }
     }
 

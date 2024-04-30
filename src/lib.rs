@@ -200,9 +200,14 @@ mod tests {
             // Draw frame
             rdr.begin_draw();
             rdr.clear(Color::BLACK);
-            rdr.print_text_raw(&format!("Time delta: {}", delta), (1, 15));
+            rdr.print_blended_text_raw(&format!("Time delta: {}", delta), (1, 15));
 
-            rdr.print_text_raw(&String::from("This text goes a bit off the window"), (-2, 0));
+            rdr.print_colored_text_raw(
+                &String::from("This text goes a bit off the window"),
+                (-2, 0),
+                Color::WHITE,
+                Color::BLACK
+            );
 
             rdr.draw_rect((3, 5), (2, 6), Color::LIGHT_BLUE);
             rdr.draw_rect((7, 3), (2, 6), Color::LIGHT_BLUE);
@@ -216,10 +221,10 @@ mod tests {
             rdr.draw_rect((24, 3), (2, 6), Color::PINK);
             rdr.draw_rect((26, 3), (2, 6), Color::PURPLE);
             rdr.draw_rect((28, 3), (2, 6), Color::GAINSBORO);
-            rdr.print_text_raw(&String::from("I can draw text that will automagically change color to be readable"), (0, 4));
+            rdr.print_blended_text_raw(&String::from("I can draw text that will automagically change color to be readable"), (0, 4));
 
             rdr.draw_rect((20, 20), (49, 7), Color::DARK_RED);
-            rdr.print_text_raw(&dynamic_text, Vec2::from(dyn_text_pos));
+            rdr.print_blended_text_raw(&dynamic_text, Vec2::from(dyn_text_pos));
             rdr.end_draw();
         }
     }

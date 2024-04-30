@@ -611,6 +611,17 @@ impl From<Vec3f> for Vec3 {
 }
 
 
+#[macro_export]
+macro_rules! vec2f {
+    ($x:expr, $y:expr) => {Vec2f::new($x as f32, $y as f32)};
+}
+
+
+#[macro_export]
+macro_rules! vec3f {
+    ($x:expr, $y:expr, $z:expr) => {Vec3f::new($x as f32, $y as f32, $z as f32)};
+}
+
 
 pub type Vec2f = Vector2<f32>;
 pub type Vec3f = Vector3<f32>;

@@ -28,603 +28,286 @@
 use std::ops::{Add, Sub, AddAssign, SubAssign, Mul, MulAssign, Div, DivAssign};
 
 
-pub trait Number: Sized + Add<Output = Self> + Sub<Output = Self> + Mul<Output = Self> + Div<Output = Self>
-        + Copy + Clone + PartialEq {}
+///  Implement binary operations with object references
+///  This comes from the rust source code
+macro_rules! forward_ref_binop {
+    (impl $imp:ident, $method:ident for $t:ty, $u:ty) => {
+        impl<'a> $imp<$u> for &'a $t {
+            type Output = <$t as $imp<$u>>::Output;
 
-impl Number for i32 {}
-impl Number for f32 {}
+            #[inline]
+            fn $method(self, other: $u) -> <$t as $imp<$u>>::Output {
+                $imp::$method(*self, other)
+            }
+        }
 
+        impl<'a> $imp<&'a $u> for $t {
+            type Output = <$t as $imp<$u>>::Output;
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
-pub struct Vector2<N: Number> {
-    pub x: N,
-    pub y: N
-}
+            #[inline]
+            fn $method(self, other: &'a $u) -> <$t as $imp<$u>>::Output {
+                $imp::$method(self, *other)
+            }
+        }
 
+        impl<'a, 'b> $imp<&'a $u> for &'b $t {
+            type Output = <$t as $imp<$u>>::Output;
 
-impl<N: Number> Vector2<N> {
-
-    pub const fn new(x: N, y: N) -> Self {
-        Self {
-            x: x,
-            y: y
+            #[inline]
+            fn $method(self, other: &'a $u) -> <$t as $imp<$u>>::Output {
+                $imp::$method(*self, *other)
+            }
         }
     }
+}
 
 
-    pub fn dot(a: Self, b: Self) -> N {
-        a.x * b.x + a.y * b.y
-    }
+/// Implement operator assignment for some type a binary operator
+macro_rules! forward_assign_binop {
+    (impl $imp:ident, $method:ident from $operator:ident for $t:ty, $u:ty) => {
+        impl $imp<$u> for $t {
+
+            #[inline]
+            fn $method(&mut self, rhs: $u) {
+                *self = Self::$operator(*self, rhs);
+            }
+        }
+
+        impl<'a> $imp<&'a $u> for $t {
+
+            #[inline]
+            fn $method(&mut self, rhs: &'a $u) {
+                *self = Self::$operator(*self, rhs);
+            }
+        }
+    };
+}
 
 
-    pub fn det(a: Self, b: Self) -> N {
-        a.x * b.y - a.y * b.x
-    }
+macro_rules! impl_reinterpret_memory_as {
+    (from $u:ty => $t:ty) => {
+        impl AsRef<$t> for $u {
+
+            #[inline]
+            fn as_ref(&self) -> &$t {
+                unsafe {
+                    let ptr: *const $u = self;
+                    &*(ptr as *const $t)
+                }
+            }
+        }
+
+        impl AsMut<$t> for $u {
+
+            #[inline]
+            fn as_mut(&mut self) -> &mut $t {
+                unsafe {
+                    let ptr: *mut $u = self;
+                    &mut *(ptr as *mut $t)
+                }
+            }
+        }
+
+        // impl<'a> AsMut<$t> for &'a $u {
+
+        //     #[inline]
+        //     fn as_mut(&mut self) -> &'a mut $t {
+        //         unsafe {
+        //             let ptr: *mut $u = *self;
+        //             &mut *(ptr as *mut $t)
+        //         }
+        //     }
+        // }
+    };
+}
 
 
-    pub fn length_sq(&self) -> N {
-        self.x * self.x + self.y * self.y
+macro_rules! impl_one_way_vector_cast {
+    (from $vec1:ty{$t1:ty, $($c1:ident),+} into $vec2:ty{$t2:ty, $($c2:ident),+}) => {
+        impl From<$vec1> for $vec2 {
+
+            #[inline]
+            fn from(value: $vec1) -> Self {
+                Self::new($(value.$c1 as $t2),+)
+            }
+        }
+    };
+}
+
+
+macro_rules! impl_vector_cast {
+    ($vec1:ty{$t1:ty, $($c1:ident),+} <=> $vec2:ty{$t2:ty, $($c2:ident),+}) => {
+        impl_one_way_vector_cast!(from $vec1{$t1, $($c1),+} into $vec2{$t2, $($c2),+});
+        impl_one_way_vector_cast!(from $vec2{$t2, $($c2),+} into $vec1{$t1, $($c1),+});
+    };
+}
+
+
+macro_rules! impl_scalar_operation {
+    (right impl $imp:ident, $method:ident from $operator:tt for $vec:ty{$t:ty, $($coord:ident),+}, $scalar:ty) => {
+        
+        impl $imp<$scalar> for $vec {
+            type Output = $vec;
+
+            #[inline]
+            fn $method(self, rhs: $scalar) -> Self::Output {
+                <$vec>::new($(self.$coord $operator rhs),+)
+            }
+        }
+    };
+    (left impl $imp:ident, $method:ident from $operator:tt for $scalar:ty, $vec:ty{$t:ty, $($coord:ident),+}) => {
+        
+        impl $imp<$vec> for $scalar {
+            type Output = $vec;
+
+            #[inline]
+            fn $method(self, rhs: $vec) -> Self::Output {
+                <$vec>::new($(self $operator rhs.$coord),+)
+            }
+        }
+    };
+}
+
+
+macro_rules! impl_vector_operation {
+    (impl $imp:ident, $method:ident from $operator:tt for $vec:ty{$t:ty, $($coord:ident),+}) => {
+        
+        impl $imp for $vec {
+            type Output = Self;
+
+            #[inline]
+            fn $method(self, rhs: Self) -> Self::Output {
+                <$vec>::new($(self.$coord $operator rhs.$coord),+)
+            }
+        }
+    };
+}
+
+
+macro_rules! impl_vec_new {
+    ($vec:ty{$t:ty, $($coord:ident),+}) => {
+        impl $vec {
+            pub const fn new($($coord: $t),+) -> Self {
+                Self {
+                    $($coord: $coord),+
+                }
+            }
+        }
+    };
+}
+
+
+macro_rules! sum {
+    ($x:expr) => {
+        $x
+    };
+    ($x:expr, $($ys:expr),+) => {
+        $x + sum!($($ys),+)
+    };
+}
+
+
+macro_rules! impl_vec_dot {
+    ($vec:ty{$t:ty, $($coord:ident),+}) => {
+        impl $vec {
+            pub fn dot(&self, other: &Self) -> $t {
+                sum!($(self.$coord * other.$coord),+)
+            }
+        }
+    };
+}
+
+macro_rules! impl_vec_len_sq {
+    ($vec:ty{$t:ty, $($coord:ident),+}) => {
+        impl $vec {
+            pub fn length_sq(&self) -> $t {
+                sum!($(self.$coord * self.$coord),+)
+            }
+        }
+    };
+}
+
+macro_rules! impl_vector_base {
+    (for $vec:ty{$t:ty, $($coord:ident),+}, $u:ty) => {
+        // Basic implementation
+        impl_vec_new!($vec{$t, $($coord),+});
+        impl_vec_dot!($vec{$t, $($coord),+});
+        impl_vec_len_sq!($vec{$t, $($coord),+});
+        impl_reinterpret_memory_as!(from $vec => $vec);
+
+        // Vector addition
+        impl_vector_operation!(impl Add, add from + for $vec{$t, $($coord),+});
+        forward_ref_binop!(impl Add, add for $vec, $vec);
+        forward_assign_binop!(impl AddAssign, add_assign from add for $vec, $vec);
+
+        // Vector subtraction
+        impl_vector_operation!(impl Sub, sub from - for $vec{$t, $($coord),+});
+        forward_ref_binop!(impl Sub, sub for $vec, $vec);
+        forward_assign_binop!(impl SubAssign, sub_assign from sub for $vec, $vec);
+
+        // Scalar multiplication
+        impl_scalar_operation!(right impl Mul, mul from * for $vec{$t, $($coord),+}, $u);
+        forward_ref_binop!(impl Mul, mul for $vec, $u);
+        forward_assign_binop!(impl MulAssign, mul_assign from mul for $vec, $u);
+
+        impl_scalar_operation!(left impl Mul, mul from * for $u, $vec{$t, $($coord),+});
+        forward_ref_binop!(impl Mul, mul for $u, $vec);
+
+        // Scalar division
+        impl_scalar_operation!(right impl Div, div from / for $vec{$t, $($coord),+}, $u);
+        forward_ref_binop!(impl Div, div for $vec, $u);
+        forward_assign_binop!(impl DivAssign, div_assign from div for $vec, $u);
+    };
+}
+
+macro_rules! impl_vec_len {
+    ($vec:ty{$t:ty, $($coord:ident),+}) => {
+        impl $vec {
+            pub fn length(&self) -> $t {
+                self.length_sq().sqrt()
+            }
+        }
+    };
+}
+
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct Vec2 {
+    pub x: i64,
+    pub y: i64
+}
+
+
+impl Vec2 {
+    pub const ZERO  : Vec2 = Vec2::new(0, 0);
+    pub const UNIT_X: Vec2 = Vec2::new(1, 0);
+    pub const UNIT_Y: Vec2 = Vec2::new(0, 1);
+    pub const ONE   : Vec2 = Vec2::new(1, 1);
+
+
+    pub fn det(&self, other: &Self) -> i64 {
+        self.x * other.y - self.y * other.x
     }
 }
 
 
-
-impl<N: Number> Add for Vector2<N> {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Self::new(self.x + rhs.x, self.y + rhs.y)
-    }
-}
-
-
-impl<N: Number> AddAssign for Vector2<N> {
-
-    fn add_assign(&mut self, rhs: Self) {
-        *self = *self + rhs;
-    }
-}
-
-
-impl<N: Number> Sub for Vector2<N> {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        Self::new(self.x - rhs.x, self.y - rhs.y)
-    }
-}
-
-
-impl<N: Number> SubAssign for Vector2<N> {
-
-    fn sub_assign(&mut self, rhs: Self) {
-        *self = *self + rhs;
-    }
-}
-
-
-impl<N: Number> Mul<N> for Vector2<N> {
-    type Output = Self;
-
-    fn mul(self, rhs: N) -> Self::Output {
-        Self::new(self.x * rhs, self.y * rhs)
-    }
-}
-
-
-impl<N: Number> MulAssign<N> for Vector2<N> {
-
-    fn mul_assign(&mut self, rhs: N) {
-        *self = *self * rhs;
-    }
-}
-
-
-impl<N: Number> Div<N> for Vector2<N> {
-    type Output = Self;
-
-    fn div(self, rhs: N) -> Self::Output {
-        Self::new(self.x / rhs, self.y / rhs)
-    }
-}
-
-
-impl<N: Number> DivAssign<N> for Vector2<N> {
-
-    fn div_assign(&mut self, rhs: N) {
-        *self = *self / rhs;
-    }
-}
+impl_vector_base!(for Vec2{i64, x, y}, i64);
+impl_reinterpret_memory_as!(from (i64, i64) => Vec2);
 
 
 #[macro_export]
 macro_rules! vec2 {
-    ($x:expr, $y:expr) => {Vec2::new($x as i32, $y as i32)};
+    ($x:expr, $y:expr) => {
+        Vec2::new(($x) as i64, ($y) as i64)
+    };
 }
 
 
-pub type Vec2 = Vector2<i32>;
-
-
-impl Vec2 {
-    pub const ZERO: Vec2 = Vec2::new(0, 0);
-    pub const UNIT_X: Vec2 = Vec2::new(1, 0);
-    pub const UNIT_Y: Vec2 = Vec2::new(0, 1);
-    pub const ONE: Vec2 = Vec2::new(1, 1);
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Vec2f {
+    pub x: f64,
+    pub y: f64
 }
-
-
-impl Eq for Vec2 {}
-
-
-
-impl AsRef<Vec2> for (u32, u32) {
-
-
-    fn as_ref(&self) -> &Vec2 {
-        if self.0 > i32::MAX as u32 || self.1 > i32::MAX as u32 {
-            panic!("Cannot convert {:?} to Vec2, integeroverflow", self);
-        }
-        unsafe {
-            let ptr: *const (u32, u32) = self;
-            &*(ptr as *const Vec2)
-        }
-    }
-}
-
-
-impl AsRef<Vec2> for (i32, i32) {
-
-
-    fn as_ref(&self) -> &Vec2 {
-        unsafe {
-            let ptr: *const (i32, i32) = self;
-            &*(ptr as *const Vec2)
-        }
-    }
-}
-
-
-impl AsMut<Vec2> for (u32, u32) {
-
-
-    fn as_mut(&mut self) -> &mut Vec2 {
-        if self.0 > i32::MAX as u32 || self.1 > i32::MAX as u32 {
-            panic!("Cannot convert {:?} to Vec2, integeroverflow", self);
-        }
-        unsafe {
-            let ptr: *mut (u32, u32) = self;
-            &mut *(ptr as *mut Vec2)
-        }
-    }
-}
-
-
-impl AsMut<Vec2> for (i32, i32) {
-
-
-    fn as_mut(&mut self) -> &mut Vec2 {
-        unsafe {
-            let ptr: *mut (i32, i32) = self;
-            &mut *(ptr as *mut Vec2)
-        }
-    }
-}
-
-
-impl Into<Vec2> for (i32, i32) {
-
-
-    fn into(self) -> Vec2 {
-        Vec2::new(self.0, self.1)
-    }
-}
-
-
-impl Into<Vec2> for (u32, u32) {
-
-
-    fn into(self) -> Vec2 {
-        Vec2::new(self.0 as i32, self.1 as i32)
-    }
-}
-
-
-impl AsRef<Vec2> for (usize, usize) {
-
-
-    fn as_ref(&self) -> &Vec2 {
-        if self.0 > i32::MAX as usize || self.1 > i32::MAX as usize {
-            panic!("Cannot convert {:?} to Vec2, integeroverflow", self);
-        }
-        unsafe {
-            let ptr: *const (usize, usize) = self;
-            &*(ptr as *const Vec2)
-        }
-    }
-}
-
-
-impl AsRef<Vec2> for (isize, isize) {
-
-
-    fn as_ref(&self) -> &Vec2 {
-        unsafe {
-            let ptr: *const (isize, isize) = self;
-            &*(ptr as *const Vec2)
-        }
-    }
-}
-
-
-impl AsMut<Vec2> for (usize, usize) {
-
-
-    fn as_mut(&mut self) -> &mut Vec2 {
-        if self.0 > i32::MAX as usize || self.1 > i32::MAX as usize {
-            panic!("Cannot convert {:?} to Vec2, integeroverflow", self);
-        }
-        unsafe {
-            let ptr: *mut (usize, usize) = self;
-            &mut *(ptr as *mut Vec2)
-        }
-    }
-}
-
-
-impl AsMut<Vec2> for (isize, isize) {
-
-
-    fn as_mut(&mut self) -> &mut Vec2 {
-        unsafe {
-            let ptr: *mut (isize, isize) = self;
-            &mut *(ptr as *mut Vec2)
-        }
-    }
-}
-
-
-impl Into<Vec2> for (isize, isize) {
-
-
-    fn into(self) -> Vec2 {
-        Vec2::new(self.0 as i32, self.1 as i32)
-    }
-}
-
-
-impl Into<Vec2> for (usize, usize) {
-
-
-    fn into(self) -> Vec2 {
-        Vec2::new(self.0 as i32, self.1 as i32)
-    }
-}
-
-
-impl AsRef<Vec2> for Vec2 {
-
-    fn as_ref(&self) -> &Vec2 {
-        self
-    }
-}
-
-
-impl AsMut<Vec2> for Vec2 {
-
-    fn as_mut(&mut self) -> &mut Vec2 {
-        self
-    }
-}
-
-impl From<Vec2f> for Vec2 {
-
-    fn from(value: Vec2f) -> Self {
-        Vec2::new(value.x as i32, value.y as i32)
-    }
-}
-
-
-
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
-pub struct Vector3<N: Number> {
-    pub x: N,
-    pub y: N,
-    pub z: N
-}
-
-
-impl<N: Number> Vector3<N> {
-
-    pub const fn new(x: N, y: N, z: N) -> Self {
-        Self {
-            x: x,
-            y: y,
-            z: z
-        }
-    }
-
-
-    pub fn dot(a: Self, b: Self) -> N {
-        a.x * b.x + a.y * b.y + a.z * b.z
-    }
-
-
-    pub fn length_sq(&self) -> N {
-        self.x * self.x + self.y * self.y + self.z * self.z
-    }
-}
-
-
-
-impl<N: Number> Add for Vector3<N> {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Self::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
-    }
-}
-
-
-impl<N: Number> AddAssign for Vector3<N> {
-
-    fn add_assign(&mut self, rhs: Self) {
-        *self = *self + rhs;
-    }
-}
-
-
-impl<N: Number> Sub for Vector3<N> {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        Self::new(self.x - rhs.x, self.y - rhs.y, self.z - rhs.z)
-    }
-}
-
-
-impl<N: Number> SubAssign for Vector3<N> {
-
-    fn sub_assign(&mut self, rhs: Self) {
-        *self = *self + rhs;
-    }
-}
-
-
-impl<N: Number> Mul<N> for Vector3<N> {
-    type Output = Self;
-
-    fn mul(self, rhs: N) -> Self::Output {
-        Self::new(self.x * rhs, self.y * rhs, self.z * rhs)
-    }
-}
-
-
-impl<N: Number> MulAssign<N> for Vector3<N> {
-
-    fn mul_assign(&mut self, rhs: N) {
-        *self = *self * rhs;
-    }
-}
-
-
-impl<N: Number> Div<N> for Vector3<N> {
-    type Output = Self;
-
-    fn div(self, rhs: N) -> Self::Output {
-        Self::new(self.x / rhs, self.y / rhs, self.z / rhs)
-    }
-}
-
-
-impl<N: Number> DivAssign<N> for Vector3<N> {
-
-    fn div_assign(&mut self, rhs: N) {
-        *self = *self / rhs;
-    }
-}
-
-
-#[macro_export]
-macro_rules! vec3 {
-    ($x:expr, $y:expr, $z:expr) => {Vec3::new($x as i32, $y as i32, $z as i32)};
-}
-
-
-pub type Vec3 = Vector3<i32>;
-
-
-impl Vec3 {
-    pub const ZERO  : Vec3 = Vec3::new(0, 0, 0);
-    pub const UNIT_X: Vec3 = Vec3::new(1, 0, 0);
-    pub const UNIT_Y: Vec3 = Vec3::new(0, 1, 0);
-    pub const UNIT_Z: Vec3 = Vec3::new(0, 0, 1);
-    pub const ONE   : Vec3 = Vec3::new(1, 1, 1);
-}
-
-
-impl AsRef<Vec3> for (u32, u32, u32) {
-
-
-    fn as_ref(&self) -> &Vec3 {
-        if self.0 > i32::MAX as u32 || self.1 > i32::MAX as u32 || self.2 > i32::MAX as u32 {
-            panic!("Cannot convert {:?} to Vec3, integeroverflow", self);
-        }
-        unsafe {
-            let ptr: *const (u32, u32, u32) = self;
-            &*(ptr as *const Vec3)
-        }
-    }
-}
-
-
-impl AsRef<Vec3> for (i32, i32, i32) {
-
-
-    fn as_ref(&self) -> &Vec3 {
-        unsafe {
-            let ptr: *const (i32, i32, i32) = self;
-            &*(ptr as *const Vec3)
-        }
-    }
-}
-
-
-impl AsMut<Vec3> for (u32, u32, u32) {
-
-
-    fn as_mut(&mut self) -> &mut Vec3 {
-        if self.0 > i32::MAX as u32 || self.1 > i32::MAX as u32 || self.2 > i32::MAX as u32 {
-            panic!("Cannot convert {:?} to Vec3, integeroverflow", self);
-        }
-        unsafe {
-            let ptr: *mut (u32, u32, u32) = self;
-            &mut *(ptr as *mut Vec3)
-        }
-    }
-}
-
-
-impl AsMut<Vec3> for (i32, i32, i32) {
-
-
-    fn as_mut(&mut self) -> &mut Vec3 {
-        unsafe {
-            let ptr: *mut (i32, i32, i32) = self;
-            &mut *(ptr as *mut Vec3)
-        }
-    }
-}
-
-
-impl Into<Vec3> for (i32, i32, i32) {
-
-
-    fn into(self) -> Vec3 {
-        Vec3::new(self.0, self.1, self.2)
-    }
-}
-
-
-impl Into<Vec3> for (u32, u32, u32) {
-
-
-    fn into(self) -> Vec3 {
-        Vec3::new(self.0 as i32, self.1 as i32, self.2 as i32)
-    }
-}
-
-
-impl AsRef<Vec3> for (usize, usize, usize) {
-
-
-    fn as_ref(&self) -> &Vec3 {
-        if self.0 > i32::MAX as usize || self.1 > i32::MAX as usize || self.2 > i32::MAX as usize {
-            panic!("Cannot convert {:?} to Vec3, integeroverflow", self);
-        }
-        unsafe {
-            let ptr: *const (usize, usize, usize) = self;
-            &*(ptr as *const Vec3)
-        }
-    }
-}
-
-
-impl AsRef<Vec3> for (isize, isize, isize) {
-
-
-    fn as_ref(&self) -> &Vec3 {
-        unsafe {
-            let ptr: *const (isize, isize, isize) = self;
-            &*(ptr as *const Vec3)
-        }
-    }
-}
-
-
-impl AsMut<Vec3> for (usize, usize, usize) {
-
-
-    fn as_mut(&mut self) -> &mut Vec3 {
-        if self.0 > i32::MAX as usize || self.1 > i32::MAX as usize || self.2 > i32::MAX as usize {
-            panic!("Cannot convert {:?} to Vec3, integeroverflow", self);
-        }
-        unsafe {
-            let ptr: *mut (usize, usize, usize) = self;
-            &mut *(ptr as *mut Vec3)
-        }
-    }
-}
-
-
-impl AsMut<Vec3> for (isize, isize, isize) {
-
-
-    fn as_mut(&mut self) -> &mut Vec3 {
-        unsafe {
-            let ptr: *mut (isize, isize, isize) = self;
-            &mut *(ptr as *mut Vec3)
-        }
-    }
-}
-
-
-impl Into<Vec3> for (isize, isize, isize) {
-
-
-    fn into(self) -> Vec3 {
-        Vec3::new(self.0 as i32, self.1 as i32, self.2 as i32)
-    }
-}
-
-
-impl Into<Vec3> for (usize, usize, usize) {
-
-
-    fn into(self) -> Vec3 {
-        Vec3::new(self.0 as i32, self.1 as i32, self.2 as i32)
-    }
-}
-
-
-impl AsRef<Vec3> for Vec3 {
-
-    fn as_ref(&self) -> &Vec3 {
-        self
-    }
-}
-
-
-impl AsMut<Vec3> for Vec3 {
-
-    fn as_mut(&mut self) -> &mut Vec3 {
-        self
-    }
-}
-
-
-impl From<Vec3f> for Vec3 {
-
-    fn from(value: Vec3f) -> Self {
-        Vec3::new(value.x as i32, value.y as i32, value.z as i32)
-    }
-}
-
-
-#[macro_export]
-macro_rules! vec2f {
-    ($x:expr, $y:expr) => {Vec2f::new($x as f32, $y as f32)};
-}
-
-
-#[macro_export]
-macro_rules! vec3f {
-    ($x:expr, $y:expr, $z:expr) => {Vec3f::new($x as f32, $y as f32, $z as f32)};
-}
-
-
-pub type Vec2f = Vector2<f32>;
-pub type Vec3f = Vector3<f32>;
 
 
 impl Vec2f {
@@ -633,22 +316,67 @@ impl Vec2f {
     pub const UNIT_Y: Vec2f = Vec2f::new(0.0, 1.0);
     pub const ONE   : Vec2f = Vec2f::new(1.0, 1.0);
 
-
-    pub fn length(&self) -> f32 {
-        self.length_sq().sqrt()
+    pub fn det(&self, other: &Self) -> f64 {
+        self.x * other.y - self.y * other.x
     }
 }
 
-impl Eq for Vec2f {}
+
+impl_vector_base!(for Vec2f{f64, x, y}, f64);
+impl_reinterpret_memory_as!(from (f64, f64) => Vec2f);
+impl_vec_len!(Vec2f{f64, x, y});
 
 
-impl From<Vec2> for Vec2f {
+#[macro_export]
+macro_rules! vec2f {
+    ($x:expr, $y:expr) => {
+        Vec2f::new(($x) as f64, ($y) as f64)
+    };
+}
 
-    fn from(value: Vec2) -> Self {
-        Vec2f::new(value.x as f32, value.y as f32)
+
+impl_vector_cast!(Vec2{i64, x, y} <=> Vec2f{f64, x, y});
+
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct Vec3 {
+    pub x: i64,
+    pub y: i64,
+    pub z: i64
+}
+
+
+impl Vec3 {
+    pub const ZERO  : Vec3 = Vec3::new(0, 0, 0);
+    pub const UNIT_X: Vec3 = Vec3::new(1, 0, 0);
+    pub const UNIT_Y: Vec3 = Vec3::new(0, 1, 0);
+    pub const UNIT_Z: Vec3 = Vec3::new(0, 0, 1);
+    pub const ONE   : Vec3 = Vec3::new(1, 1, 1);
+
+    pub fn cross(&self, other: &Self) -> i64 {
+        self.x * other.y - self.y * other.x
     }
 }
 
+
+impl_vector_base!(for Vec3{i64, x, y, z}, i64);
+impl_reinterpret_memory_as!(from (i64, i64, i64) => Vec3);
+
+
+#[macro_export]
+macro_rules! vec3 {
+    ($x:expr, $y:expr, $z:expr) => {
+        Vec3::new(($x) as i64, ($y) as i64, ($z) as i64)
+    };
+}
+
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Vec3f {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64
+}
 
 
 impl Vec3f {
@@ -658,18 +386,24 @@ impl Vec3f {
     pub const UNIT_Z: Vec3f = Vec3f::new(0.0, 0.0, 1.0);
     pub const ONE   : Vec3f = Vec3f::new(1.0, 1.0, 1.0);
 
-    pub fn length(&self) -> f32 {
-        self.length_sq().sqrt()
+
+    pub fn cross(&self, other: &Self) -> f64 {
+        self.x * other.y - self.y * other.x
     }
 }
 
 
-impl Eq for Vec3f {}
+impl_vector_base!(for Vec3f{f64, x, y, z}, f64);
+impl_reinterpret_memory_as!(from (f64, f64, f64) => Vec3f);
+impl_vec_len!(Vec3f{f64, x, y, z});
 
 
-impl From<Vec3> for Vec3f {
+impl_vector_cast!(Vec3{i64, x, y, z} <=> Vec3f{f64, x, y, z});
 
-    fn from(value: Vec3) -> Self {
-        Vec3f::new(value.x as f32, value.y as f32, value.z as f32)
-    }
+
+#[macro_export]
+macro_rules! vec3f {
+    ($x:expr, $y:expr, $z:expr) => {
+        Vec3f::new(($x) as f64, ($y) as f64, ($z) as f64)
+    };
 }

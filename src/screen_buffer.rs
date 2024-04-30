@@ -163,11 +163,11 @@ impl ScreeBuffer {
         
 
         let char_iter = text.chars().enumerate()
-            .skip((-cmp::min(pos.x, 0i32)) as usize);
+            .skip((-cmp::min(pos.x, 0i64)) as usize);
 
         
         for (i, c) in char_iter {
-            let x = pos.x + (i as i32);
+            let x = pos.x + (i as i64);
             let char_pos = vec2!(x, pos.y);
 
             if x < 0 {

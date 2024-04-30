@@ -231,7 +231,7 @@ impl Color {
     }
 
 
-    pub fn raw_rgb(r: f32, g: f32, b: f32) -> Self {
+    pub fn raw_rgb(r: f64, g: f64, b: f64) -> Self {
         Self {
             r: (r * 255.0).clamp(0.0, 255.0) as u8,
             g: (g * 255.0).clamp(0.0, 255.0) as u8,
@@ -245,7 +245,7 @@ impl Color {
     }
 
 
-    pub fn okhsl(h: f32, s: f32, l: f32) -> Self {
+    pub fn okhsl(h: f64, s: f64, l: f64) -> Self {
         let okhsl = Okhsl::new(h, s, l);
         let srgb = Srgb::from_color(okhsl);
         let rgb = srgb.into_linear();
@@ -253,8 +253,8 @@ impl Color {
     }
 
 
-    pub fn get_raw(&self) -> (f32, f32, f32) {
-        (self.r as f32 / 255.0, self.g as f32 / 255.0, self.b as f32 / 255.0)
+    pub fn get_raw(&self) -> (f64, f64, f64) {
+        (self.r as f64 / 255.0, self.g as f64 / 255.0, self.b as f64 / 255.0)
     }
 
 
@@ -266,7 +266,7 @@ impl Color {
 
     pub fn get_okhsl(&self) -> (f32, f32, f32) {
         let (r, g, b) = self.get_raw();
-        let okhsl: Okhsl = Okhsl::from_color(LinSrgb::new(r, g, b));
+        let okhsl: Okhsl = Okhsl::from_color(LinSrgb::new(r as f32, g as f32, b as f32));
         (okhsl.hue.into_inner(), okhsl.saturation, okhsl.lightness)
     }
 

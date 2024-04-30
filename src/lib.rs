@@ -57,7 +57,7 @@ mod tests {
     use crate::img::*;
     use crate::input::{Input, InputEvent, KeyEvent, MouseEvent};
 
-    use std::f32::consts::TAU;
+    use std::f64::consts::TAU;
     use std::sync::{Arc, Mutex};
     use std::time::{Duration, Instant};
     use std::thread::sleep;
@@ -153,16 +153,16 @@ mod tests {
         let mut dyn_text_speed: Vec2f = Vec2f::new(TAU * 10.0, 17.0);
 
         let mut instant = Instant::now();
-        let max_frame_rate: f32 = 60.0;
-        let max_frame_time: f32 = 1.0 / max_frame_rate;
+        let max_frame_rate: f64 = 60.0;
+        let max_frame_time: f64 = 1.0 / max_frame_rate;
 
         loop {
             // Limit frame rate
-            let delta: f32 = instant.elapsed().as_secs_f32();
+            let delta: f64 = instant.elapsed().as_secs_f64();
             if delta < max_frame_time {
-                sleep(Duration::from_secs_f32(max_frame_time - delta));
+                sleep(Duration::from_secs_f64(max_frame_time - delta));
             }
-            let delta: f32 = instant.elapsed().as_secs_f32();
+            let delta: f64 = instant.elapsed().as_secs_f64();
             instant = Instant::now();
             
 
@@ -186,7 +186,7 @@ mod tests {
             if dyn_text_pos.x <= 1.0 {
                 dyn_text_speed.x = dyn_text_speed.x.abs();
             }
-            if dyn_text_pos.x >= size.x - dyn_text_char_count as f32 - 1.0 {
+            if dyn_text_pos.x >= size.x - dyn_text_char_count as f64 - 1.0 {
                 dyn_text_speed.x = -dyn_text_speed.x.abs();
             }
             if dyn_text_pos.y <= 1.0 {

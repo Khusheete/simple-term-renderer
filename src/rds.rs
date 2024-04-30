@@ -377,11 +377,11 @@ impl Renderer {
         self.building_frame = true;
         let new_size = Renderer::get_size();
         if self.prev_screen_size != new_size {
-            self.sender.send(RenderingDirective::UpdateScreenSize(new_size)).expect("Rendering thread stoped");
+            self.sender.send(RenderingDirective::UpdateScreenSize(new_size)).expect("Rendering thread stopped");
             self.prev_screen_size = new_size;
         }
 
-        self.sender.send(RenderingDirective::BeginFrame).expect("Rendering thread stoped");
+        self.sender.send(RenderingDirective::BeginFrame).expect("Rendering thread stopped");
         self.frame_barrier.wait();
     }
 
@@ -392,29 +392,29 @@ impl Renderer {
             panic!("end_draw called when already building a frame");
         }
         self.building_frame = false;
-        self.sender.send(RenderingDirective::PushFrame).expect("Rendering thread stoped");
+        self.sender.send(RenderingDirective::PushFrame).expect("Rendering thread stopped");
     }
 
 
     /// Clears the screen (color and text).
     pub fn clear(&mut self, c: Color) {
         self.can_draw();
-        self.sender.send(RenderingDirective::ClearColor(c)).expect("Rendering thread stoped");
-        self.sender.send(RenderingDirective::ClearText).expect("Rendering thread stoped");
+        self.sender.send(RenderingDirective::ClearColor(c)).expect("Rendering thread stopped");
+        self.sender.send(RenderingDirective::ClearText).expect("Rendering thread stopped");
     }
 
 
     /// Sets all the pixels' color in the screen to `c` (does not clear text).
     pub fn clear_color(&mut self, c: Color) {
         self.can_draw();
-        self.sender.send(RenderingDirective::ClearColor(c)).expect("Rendering thread stoped");
+        self.sender.send(RenderingDirective::ClearColor(c)).expect("Rendering thread stopped");
     }
 
 
     /// Removes all text from the screen.
     pub fn clear_text(&mut self) {
         self.can_draw();
-        self.sender.send(RenderingDirective::ClearText).expect("Rendering thread stoped");
+        self.sender.send(RenderingDirective::ClearText).expect("Rendering thread stopped");
     }
 
 
@@ -424,7 +424,7 @@ impl Renderer {
     {
         self.can_draw();
         self.sender.send(RenderingDirective::DrawLine(*p1.as_ref(), *p2.as_ref(), c))
-            .expect("Rendering thread stoped");
+            .expect("Rendering thread stopped");
     }
 
 
@@ -435,7 +435,7 @@ impl Renderer {
     {
         self.can_draw();
         self.sender.send(RenderingDirective::DrawRect(*p.as_ref(), *s.as_ref(), c))
-            .expect("Rendering thread stoped");
+            .expect("Rendering thread stopped");
     }
 
 
@@ -445,7 +445,7 @@ impl Renderer {
     {
         self.can_draw();
         self.sender.send(RenderingDirective::DrawRectBoudary(*p.as_ref(), *s.as_ref(), c))
-            .expect("Rendering thread stoped");
+            .expect("Rendering thread stopped");
     }
 
 
@@ -456,7 +456,7 @@ impl Renderer {
     {
         self.can_draw();
         self.sender.send(RenderingDirective::DrawEllipseBoudary(*c.as_ref(), *s.as_ref(), col))
-            .expect("Rendering thread stoped");
+            .expect("Rendering thread stopped");
     }
 
 
@@ -465,7 +465,7 @@ impl Renderer {
         where A: AsRef<Vec2>
     {
         self.can_draw();
-        self.sender.send(RenderingDirective::DrawPoint(*p.as_ref(), c)).expect("Rendering thread stoped");
+        self.sender.send(RenderingDirective::DrawPoint(*p.as_ref(), c)).expect("Rendering thread stopped");
     }
 
 
@@ -478,7 +478,7 @@ impl Renderer {
     {
         self.can_draw();
         self.sender.send(RenderingDirective::DrawImage(img, *pos.as_ref(), *size.as_ref(), *offset.as_ref(), alpha))
-            .expect("Rendering thread stoped");
+            .expect("Rendering thread stopped");
     }
 
 
@@ -493,7 +493,7 @@ impl Renderer {
     {
         self.can_draw();
         self.sender.send(RenderingDirective::DrawWholeImageAlpha(img, *pos.as_ref(), alpha))
-            .expect("Rendering thread stoped");
+            .expect("Rendering thread stopped");
     }
 
 
@@ -507,7 +507,7 @@ impl Renderer {
         where A: AsRef<Vec2>
     {
         self.can_draw();
-        self.sender.send(RenderingDirective::DrawWholeImage(img, *pos.as_ref())).expect("Rendering thread stoped");
+        self.sender.send(RenderingDirective::DrawWholeImage(img, *pos.as_ref())).expect("Rendering thread stopped");
     }
 
 
@@ -515,7 +515,7 @@ impl Renderer {
         where A: AsRef<Vec2>
     {
         self.can_draw();
-        self.sender.send(RenderingDirective::PrintTextRaw(text.clone(), *pos.as_ref())).expect("Rendering thread stoped");
+        self.sender.send(RenderingDirective::PrintTextRaw(text.clone(), *pos.as_ref())).expect("Rendering thread stopped");
     }
 
 

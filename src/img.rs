@@ -231,7 +231,7 @@ impl Color {
     }
 
 
-    pub fn raw_rgb(r: f64, g: f64, b: f64) -> Self {
+    pub fn raw_rgb(r: f32, g: f32, b: f32) -> Self {
         Self {
             r: (r * 255.0).clamp(0.0, 255.0) as u8,
             g: (g * 255.0).clamp(0.0, 255.0) as u8,
@@ -241,11 +241,11 @@ impl Color {
 
 
     pub fn raw_vec3_rgb(c: Vec3f) -> Self {
-        Self::raw_rgb(c.x, c.y, c.z)
+        Self::raw_rgb(c.x as f32, c.y as f32, c.z as f32)
     }
 
 
-    pub fn okhsl(h: f64, s: f64, l: f64) -> Self {
+    pub fn okhsl(h: f32, s: f32, l: f32) -> Self {
         let okhsl = Okhsl::new(h, s, l);
         let srgb = Srgb::from_color(okhsl);
         let rgb = srgb.into_linear();
@@ -253,14 +253,14 @@ impl Color {
     }
 
 
-    pub fn get_raw(&self) -> (f64, f64, f64) {
-        (self.r as f64 / 255.0, self.g as f64 / 255.0, self.b as f64 / 255.0)
+    pub fn get_raw(&self) -> (f32, f32, f32) {
+        (self.r as f32 / 255.0, self.g as f32 / 255.0, self.b as f32 / 255.0)
     }
 
 
     pub fn get_raw_vec3f(&self) -> Vec3f {
         let (r, g, b) = self.get_raw();
-        Vec3f::new(r, g, b)
+        vec3f!(r, g, b)
     }
 
 
@@ -329,7 +329,7 @@ impl Image {
         for i in 0..img.width() {
             for j in 0..img.height() {
                 let px = img.get_pixel(i, j).channels();
-                result[vec2!(i as i32, j as i32)] = Color::rgb(px[0], px[1], px[2]);
+                result[vec2!(i as i64, j as i64)] = Color::rgb(px[0], px[1], px[2]);
             }
         }
         Ok(result)

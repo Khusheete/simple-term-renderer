@@ -91,7 +91,7 @@ pub enum MouseButton {
 
 
 fn get_real_mouse_pos(cx: u16, cy: u16) -> Vec2 {
-    vec2!(cx as i32 - 1, 2 * (cy as i32) - 2)
+    vec2!(cx as i64 - 1, 2 * (cy as i64) - 2)
 }
 
 

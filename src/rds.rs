@@ -356,7 +356,7 @@ impl Renderer {
         unsafe {
             let mut size: TermSize = mem::zeroed();
             libc::ioctl(libc::STDOUT_FILENO, libc::TIOCGWINSZ, &mut size as *mut _);
-            vec2!(size.col as i32, 2 * size.row as i32)
+            vec2!(size.col as i64, 2 * size.row as i64)
         }
     }
 

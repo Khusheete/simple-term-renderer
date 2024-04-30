@@ -145,7 +145,7 @@ mod tests {
     fn text() {
         let rdr = Renderer::get();
         let inp = Input::get();
-
+        
         let dynamic_text = String::from("Some dynamic text !!!");
         let dyn_text_char_count = dynamic_text.chars().count();
 

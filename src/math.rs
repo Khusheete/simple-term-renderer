@@ -266,6 +266,10 @@ macro_rules! impl_vec_len {
             pub fn length(&self) -> $t {
                 self.length_sq().sqrt()
             }
+
+            pub fn normalized(&self) -> Self {
+                self / self.length()
+            }
         }
     };
 }

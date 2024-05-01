@@ -210,7 +210,7 @@ macro_rules! sum {
 macro_rules! impl_vec_dot {
     ($vec:ty{$t:ty, $($coord:ident),+}) => {
         impl $vec {
-            pub fn dot(&self, other: &Self) -> $t {
+            pub fn dot(&self, other: Self) -> $t {
                 sum!($(self.$coord * other.$coord),+)
             }
         }

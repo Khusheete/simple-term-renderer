@@ -26,7 +26,7 @@
 
 
 use crate::buffer2d::Buffer2D;
-use crate::math::{Vec2, Vec3f};
+use crate::math::{Vec2i, Vec3};
 
 use std::ops::{Index, IndexMut};
 use std::fmt;
@@ -241,7 +241,7 @@ impl Color {
     }
 
 
-    pub fn raw_vec3_rgb(c: Vec3f) -> Self {
+    pub fn raw_vec3_rgb(c: Vec3) -> Self {
         Self::raw_rgb(c.x as f32, c.y as f32, c.z as f32)
     }
 
@@ -259,9 +259,9 @@ impl Color {
     }
 
 
-    pub fn get_raw_vec3f(&self) -> Vec3f {
+    pub fn get_raw_vec3f(&self) -> Vec3 {
         let (r, g, b) = self.get_raw();
-        vec3f!(r, g, b)
+        vec3!(r, g, b)
     }
 
 
@@ -308,7 +308,7 @@ impl Image {
 
     /// Creates an image of size (`w`, `h`). All the pixels are set to black.
     pub fn new<V>(size: V) -> Self
-        where V: AsRef<Vec2>
+        where V: AsRef<Vec2i>
     {
         Self {
             data: Buffer2D::new(*size.as_ref(), Color::BLACK)
@@ -326,11 +326,11 @@ impl Image {
             }
             Err(e) => return Err(format!("{}", e))
         }.to_rgb8();
-        let mut result = Image::new(vec2!(img.width(), img.height()));
+        let mut result = Image::new(vec2i!(img.width(), img.height()));
         for i in 0..img.width() {
             for j in 0..img.height() {
                 let px = img.get_pixel(i, j).channels();
-                result[vec2!(i as i64, j as i64)] = Color::rgb(px[0], px[1], px[2]);
+                result[vec2i!(i as i64, j as i64)] = Color::rgb(px[0], px[1], px[2]);
             }
         }
         Ok(result)
@@ -344,7 +344,7 @@ impl Image {
         for i in 0..self.size().x {
             for j in 0..self.size().y {
                 let pix = img.get_pixel_mut(i as u32, j as u32);
-                let c = self[vec2!(i, j)];
+                let c = self[vec2i!(i, j)];
                 pix.0 = [c.r, c.g, c.b];
             }
         }
@@ -357,7 +357,7 @@ impl Image {
 
 
     /// Returns the size of the image.
-    pub fn size(&self) -> Vec2 {
+    pub fn size(&self) -> Vec2i {
         self.data.size()
     }
 
@@ -365,7 +365,7 @@ impl Image {
     /// Resizes the image. New pixels are set to black.
     /// It corrupts the image (pixel position is misinterpreted, but it is faster than Image::resize).
     pub fn raw_resize<A>(&mut self, new_size: A) 
-        where A: AsRef<Vec2>
+        where A: AsRef<Vec2i>
     {
         self.data.raw_resize(*new_size.as_ref(), Color::BLACK);
     }
@@ -373,14 +373,14 @@ impl Image {
 
     /// NOT IMPLEMENTED Resizes the image keeping the top left part of the image
     pub fn resize<A>(&mut self, new_size: A) 
-        where A: AsRef<Vec2>
+        where A: AsRef<Vec2i>
     {
         self.data.resize(*new_size.as_ref(), Color::BLACK);
     }
 
 
     fn is_out_of_range<A>(&self, p: A) -> bool
-        where A: AsRef<Vec2> 
+        where A: AsRef<Vec2i> 
     {
         let p = p.as_ref();
         p.x < 0 || p.y < 0 || p.x >= self.size().x || p.y >= self.size().y
@@ -389,7 +389,7 @@ impl Image {
 
     /// Sets the pixel color at `p` to `c`.
     pub fn point<A>(&mut self, p: A, c: Color)
-        where A: AsRef<Vec2>
+        where A: AsRef<Vec2i>
     {
         self[*p.as_ref()] = c;
     }
@@ -397,7 +397,7 @@ impl Image {
 
     /// Draws a line of color `c` between `p1` and `p2`.
     pub fn line<A, B>(&mut self, p1: A, p2: B, c: Color)
-        where A: AsRef<Vec2>, B: AsRef<Vec2> 
+        where A: AsRef<Vec2i>, B: AsRef<Vec2i> 
     {
         let mut p1 = *p1.as_ref();
         let p2 = p2.as_ref();
@@ -432,7 +432,7 @@ impl Image {
 
     /// Same as `rect` but draws only the four sides of the rectangle.
     pub fn rect_boudary<A, B>(&mut self, p: A, s: B, c: Color)
-        where A: AsRef<Vec2>, B: AsRef<Vec2>
+        where A: AsRef<Vec2i>, B: AsRef<Vec2i>
     {
         let p = p.as_ref();
         let s = s.as_ref();
@@ -446,7 +446,7 @@ impl Image {
     /// Draws a rectangle of color `c` and of size `s`. 
     /// `p` is the coordinate of the top left corner of the rectangle.
     pub fn rect<A, B>(&mut self, p: A, s: B, c: Color) 
-        where A: AsRef<Vec2>, B: AsRef<Vec2>
+        where A: AsRef<Vec2i>, B: AsRef<Vec2i>
     {
         let mut p = *p.as_ref();
         let mut s = *s.as_ref();
@@ -483,7 +483,7 @@ impl Image {
 
 
     fn plot_ellipse_points<A, B>(&mut self, center: A, pos: B, c: Color) 
-        where A: AsRef<Vec2>, B: AsRef<Vec2>
+        where A: AsRef<Vec2i>, B: AsRef<Vec2i>
     {
         let center = center.as_ref();
         let pos    = pos.as_ref();
@@ -497,7 +497,7 @@ impl Image {
     /// Draws an ellipse of color `col`. `c` is the center of the ellipse and `s` is the size of the rectangle
     /// in which the ellipse is inscribed.
     pub fn ellipse_boundary<A, B>(&mut self, center: A, size: B, c: Color) 
-        where A: AsRef<Vec2>, B: AsRef<Vec2>
+        where A: AsRef<Vec2i>, B: AsRef<Vec2i>
     {
         let center = center.as_ref();
         let size   = size.as_ref();
@@ -559,7 +559,7 @@ impl Image {
     /// 
     /// Negative size results in flipped image. Alpha is used to ignore a given color while drawing.
     pub fn image<A, B, C>(&mut self, img: &Image, pos: A, size: B, offset: C, alpha: Option<Color>) 
-        where A: AsRef<Vec2>, B: AsRef<Vec2>, C: AsRef<Vec2>
+        where A: AsRef<Vec2i>, B: AsRef<Vec2i>, C: AsRef<Vec2i>
     {
         let offset = offset.as_ref();
         let mut p = *pos.as_ref();
@@ -590,8 +590,8 @@ impl Image {
                 if x >= self.size().x {break}
                 if src_x >= img.size().x {break}
 
-                let pos = vec2!(x, y);
-                let src_pos = vec2!(src_x, src_y);
+                let pos = vec2i!(x, y);
+                let src_pos = vec2i!(src_x, src_y);
 
                 if let Some(acolor) = alpha {
                     if acolor == img[src_pos] {
@@ -608,12 +608,12 @@ impl Image {
     /// 
     /// Literally:
     /// ```
-    /// <image>.image(img, pos, img.size(), Vec2::ZERO, Some(alpha));
+    /// <image>.image(img, pos, img.size(), Vec2i::ZERO, Some(alpha));
     /// ```
     pub fn whole_image_alpha<A>(&mut self, img: &Image, pos: A, alpha: Color) 
-        where A: AsRef<Vec2>
+        where A: AsRef<Vec2i>
     {
-        self.image(img, pos, img.size(), Vec2::ZERO, Some(alpha));
+        self.image(img, pos, img.size(), Vec2i::ZERO, Some(alpha));
     }
 
 
@@ -621,17 +621,17 @@ impl Image {
     /// 
     /// Literally:
     /// ```
-    /// <image>.image(img, pos, img.size(), Vec2::ZERO, None);
+    /// <image>.image(img, pos, img.size(), Vec2i::ZERO, None);
     /// ```
     pub fn whole_image<A>(&mut self, img: &Image, pos: A) 
-        where A: AsRef<Vec2>
+        where A: AsRef<Vec2i>
     {
-        self.image(img, pos, img.size(), Vec2::ZERO, None);
+        self.image(img, pos, img.size(), Vec2i::ZERO, None);
     }
 }
 
 
-impl<A: AsRef<Vec2>> Index<A> for Image {
+impl<A: AsRef<Vec2i>> Index<A> for Image {
     type Output = Color;
 
     fn index(&self, p: A) -> &Self::Output {
@@ -645,7 +645,7 @@ impl<A: AsRef<Vec2>> Index<A> for Image {
 }
 
 
-impl<A: AsRef<Vec2>> IndexMut<A> for Image {
+impl<A: AsRef<Vec2i>> IndexMut<A> for Image {
 
     fn index_mut(&mut self, p: A) -> &mut Self::Output {
         static mut TEMP: Color = Color::BLACK;

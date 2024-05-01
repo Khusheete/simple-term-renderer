@@ -37,7 +37,7 @@ use std::io::{Read, Write, stdin, stdout};
 
 use std::thread;
 
-use crate::math::Vec2;
+use crate::math::Vec2i;
 
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -74,9 +74,9 @@ pub enum KeyEvent {
 // TODO: add modifiers (shift, ctrl, meta) to MouseEvent
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum MouseEvent {
-    ButtonPressed(MouseButton, Vec2),
-    ButtonReleased(MouseButton, Vec2),
-    Hold(MouseButton, Vec2)
+    ButtonPressed(MouseButton, Vec2i),
+    ButtonReleased(MouseButton, Vec2i),
+    Hold(MouseButton, Vec2i)
 }
 
 
@@ -91,8 +91,8 @@ pub enum MouseButton {
 
 
 
-fn get_real_mouse_pos(cx: u16, cy: u16) -> Vec2 {
-    vec2!(cx as i64 - 1, 2 * (cy as i64) - 2)
+fn get_real_mouse_pos(cx: u16, cy: u16) -> Vec2i {
+    vec2i!(cx as i64 - 1, 2 * (cy as i64) - 2)
 }
 
 

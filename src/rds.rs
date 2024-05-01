@@ -27,7 +27,7 @@
 
 extern crate libc;
 
-use crate::math::Vec2;
+use crate::math::Vec2i;
 use crate::img::{BlendMode, Color, Image};
 use crate::input::Input;
 use crate::screen_buffer::*;
@@ -62,22 +62,22 @@ macro_rules! csi {
 
 /// Commands that are sent to the rendering server by the Renderer singleton.
 enum RenderingDirective {
-    DrawLine(Vec2, Vec2, Color),
-    DrawRect(Vec2, Vec2, Color),
-    DrawRectBoudary(Vec2, Vec2, Color),
-    DrawEllipseBoudary(Vec2, Vec2, Color),
-    DrawPoint(Vec2, Color),
+    DrawLine(Vec2i, Vec2i, Color),
+    DrawRect(Vec2i, Vec2i, Color),
+    DrawRectBoudary(Vec2i, Vec2i, Color),
+    DrawEllipseBoudary(Vec2i, Vec2i, Color),
+    DrawPoint(Vec2i, Color),
 
-    DrawImage(Arc<Mutex<Image>>, Vec2, Vec2, Vec2, Option<Color>),
-    DrawWholeImageAlpha(Arc<Mutex<Image>>, Vec2, Color),
-    DrawWholeImage(Arc<Mutex<Image>>, Vec2),
+    DrawImage(Arc<Mutex<Image>>, Vec2i, Vec2i, Vec2i, Option<Color>),
+    DrawWholeImageAlpha(Arc<Mutex<Image>>, Vec2i, Color),
+    DrawWholeImage(Arc<Mutex<Image>>, Vec2i),
 
-    PrintTextRaw(String, Vec2, CharBackgroundMode, CharForegroundMode),
+    PrintTextRaw(String, Vec2i, CharBackgroundMode, CharForegroundMode),
 
     ClearColor(Color),
     ClearText,
 
-    UpdateScreenSize(Vec2),
+    UpdateScreenSize(Vec2i),
     BeginFrame,
     PushFrame
 }
@@ -112,7 +112,7 @@ pub struct Renderer {
     default_c_cc: [u8; NCCS],
 
     building_frame: bool,
-    prev_screen_size: Vec2,
+    prev_screen_size: Vec2i,
 
     _server_handle: Option<thread::JoinHandle<()>>,
     sender: mpsc::Sender<RenderingDirective>,
@@ -206,8 +206,8 @@ impl Renderer {
 
                         for j in (0..screen_size.y).step_by(2) {
                             for i in 0..screen_size.x {
-                                let pos1 = vec2!(i, j);
-                                let pos2 = vec2!(i, j + 1);
+                                let pos1 = vec2i!(i, j);
+                                let pos2 = vec2i!(i, j + 1);
 
                                 let color1 = screen.get_color(pos1);
                                 let color2 = screen.get_color(pos2);
@@ -317,7 +317,7 @@ impl Renderer {
             default_c_cc: default_c_cc,
 
             building_frame: false,
-            prev_screen_size: Vec2::ZERO,
+            prev_screen_size: Vec2i::ZERO,
 
             _server_handle: Some(handle),
             sender: rx,
@@ -356,11 +356,11 @@ impl Renderer {
     /// size.x // width of the screen
     /// size.y // height of the screen
     /// ```
-    pub fn get_size() -> Vec2 {
+    pub fn get_size() -> Vec2i {
         unsafe {
             let mut size: TermSize = mem::zeroed();
             libc::ioctl(libc::STDOUT_FILENO, libc::TIOCGWINSZ, &mut size as *mut _);
-            vec2!(size.col as i32, 2 * size.row as i32)
+            vec2i!(size.col as i32, 2 * size.row as i32)
         }
     }
 
@@ -424,7 +424,7 @@ impl Renderer {
 
     /// Draws a line of color `c` between `p1` and `p2`.
     pub fn draw_line<A, B>(&mut self, p1: A, p2: B, c: Color) 
-        where A: AsRef<Vec2>, B: AsRef<Vec2>
+        where A: AsRef<Vec2i>, B: AsRef<Vec2i>
     {
         self.can_draw();
         self.sender.send(RenderingDirective::DrawLine(*p1.as_ref(), *p2.as_ref(), c))
@@ -435,7 +435,7 @@ impl Renderer {
     /// Draws a rectangle of color `c` and of size `s`. 
     /// `p` is the coordinate of the top left corner of the rectangle.
     pub fn draw_rect<A, B>(&mut self, p: A, s: B, c: Color) 
-        where A: AsRef<Vec2>, B: AsRef<Vec2>
+        where A: AsRef<Vec2i>, B: AsRef<Vec2i>
     {
         self.can_draw();
         self.sender.send(RenderingDirective::DrawRect(*p.as_ref(), *s.as_ref(), c))
@@ -445,7 +445,7 @@ impl Renderer {
 
     /// Same as `draw_rect` but draws only the four sides of the rectangle.
     pub fn draw_rect_boundary<A, B>(&mut self, p: A, s: B, c: Color) 
-        where A: AsRef<Vec2>, B: AsRef<Vec2>
+        where A: AsRef<Vec2i>, B: AsRef<Vec2i>
     {
         self.can_draw();
         self.sender.send(RenderingDirective::DrawRectBoudary(*p.as_ref(), *s.as_ref(), c))
@@ -456,7 +456,7 @@ impl Renderer {
     /// Draws an ellipse of color `col`. `c` is the center of the ellipse and `s` is the size of the rectangle
     /// in which the ellipse is inscribed.
     pub fn draw_ellipse_boundary<A, B>(&mut self, c: A, s: B, col: Color) 
-        where A: AsRef<Vec2>, B: AsRef<Vec2>
+        where A: AsRef<Vec2i>, B: AsRef<Vec2i>
     {
         self.can_draw();
         self.sender.send(RenderingDirective::DrawEllipseBoudary(*c.as_ref(), *s.as_ref(), col))
@@ -466,7 +466,7 @@ impl Renderer {
 
     /// Sets the color of the pixel at `p` to `c`.
     pub fn draw_point<A>(&mut self, p: A, c: Color) 
-        where A: AsRef<Vec2>
+        where A: AsRef<Vec2i>
     {
         self.can_draw();
         self.sender.send(RenderingDirective::DrawPoint(*p.as_ref(), c)).expect("Rendering thread stopped");
@@ -478,7 +478,7 @@ impl Renderer {
     /// Negative size results in flipped image. Alpha is used to ignore a given color while drawing.
     pub fn draw_image<A, B, C>(&mut self, 
         img: Arc<Mutex<Image>>, pos: A, size: B, offset: C, alpha: Option<Color>) 
-        where A: AsRef<Vec2>, B: AsRef<Vec2>, C: AsRef<Vec2>
+        where A: AsRef<Vec2i>, B: AsRef<Vec2i>, C: AsRef<Vec2i>
     {
         self.can_draw();
         self.sender.send(RenderingDirective::DrawImage(img, *pos.as_ref(), *size.as_ref(), *offset.as_ref(), alpha))
@@ -490,10 +490,10 @@ impl Renderer {
     /// 
     /// Equivalent to:
     /// ```
-    /// rdr.image(img, pos, img.size(), Vec2::ZERO, Some(alpha));
+    /// rdr.image(img, pos, img.size(), Vec2i::ZERO, Some(alpha));
     /// ```
     pub fn draw_whole_image_alpha<A>(&mut self, img: Arc<Mutex<Image>>, pos: A, alpha: Color) 
-        where A: AsRef<Vec2>
+        where A: AsRef<Vec2i>
     {
         self.can_draw();
         self.sender.send(RenderingDirective::DrawWholeImageAlpha(img, *pos.as_ref(), alpha))
@@ -505,10 +505,10 @@ impl Renderer {
     /// 
     /// Equivalent to:
     /// ```
-    /// rdr.image(img, pos, img.size(), Vec2::ZERO, None);
+    /// rdr.image(img, pos, img.size(), Vec2i::ZERO, None);
     /// ```
     pub fn draw_whole_image<A>(&mut self, img: Arc<Mutex<Image>>, pos: A) 
-        where A: AsRef<Vec2>
+        where A: AsRef<Vec2i>
     {
         self.can_draw();
         self.sender.send(RenderingDirective::DrawWholeImage(img, *pos.as_ref())).expect("Rendering thread stopped");
@@ -516,7 +516,7 @@ impl Renderer {
 
 
     pub fn print_text_raw<A>(&mut self, text: &String, pos: A, background_mode: CharBackgroundMode, foreground_mode: CharForegroundMode)
-        where A: AsRef<Vec2>
+        where A: AsRef<Vec2i>
     {
         self.can_draw();
         self.sender.send(RenderingDirective::PrintTextRaw(text.clone(), *pos.as_ref(), background_mode, foreground_mode))
@@ -525,7 +525,7 @@ impl Renderer {
 
 
     pub fn print_blended_text_raw<A>(&mut self, text: &String, pos: A)
-        where A: AsRef<Vec2>
+        where A: AsRef<Vec2i>
     {
         self.print_text_raw(
             text,
@@ -537,7 +537,7 @@ impl Renderer {
 
 
     pub fn print_colored_text_raw<A>(&mut self, text: &String, pos: A, background_color: Color, foreground_color: Color)
-        where A: AsRef<Vec2>
+        where A: AsRef<Vec2i>
     {
         self.print_text_raw(
             text,

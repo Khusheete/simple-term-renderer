@@ -25,7 +25,7 @@
 */
 
 
-use std::ops::{Add, Sub, AddAssign, SubAssign, Mul, MulAssign, Div, DivAssign};
+use std::ops::{Add, Sub, AddAssign, SubAssign, Mul, MulAssign, Div, DivAssign, Neg};
 
 
 ///  Implement binary operations with object references
@@ -227,6 +227,18 @@ macro_rules! impl_vec_len_sq {
     };
 }
 
+macro_rules! impl_vec_neg {
+    ($vec:ty{$t:ty, $($coord:ident),+}) => {
+        impl Neg for $vec {
+            type Output = Self;
+
+            fn neg(self) -> Self {
+                Self::new($(-self.$coord),+)
+            }
+        }
+    };
+}
+
 macro_rules! impl_vector_base {
     (for $vec:ty{$t:ty, $($coord:ident),+}, $u:ty) => {
         // Basic implementation
@@ -257,6 +269,9 @@ macro_rules! impl_vector_base {
         impl_scalar_operation!(right impl Div, div from / for $vec{$t, $($coord),+}, $u);
         forward_ref_binop!(impl Div, div for $vec, $u);
         forward_assign_binop!(impl DivAssign, div_assign from div for $vec, $u);
+
+        // Negation
+        impl_vec_neg!($vec{$t, $($coord),+});
     };
 }
 
@@ -275,50 +290,42 @@ macro_rules! impl_vec_len {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct Vec2 {
-    pub x: i64,
-    pub y: i64
-}
+macro_rules! define_matrice_type {
+    ($mat:ident{$vec:ty{$t:ty, $($coord:ident),+}}) => {
+        // Definition
+        pub struct $mat {
+            $($coord: $vec),+
+        }
 
 
-impl Vec2 {
-    pub const ZERO  : Vec2 = Vec2::new(0, 0);
-    pub const UNIT_X: Vec2 = Vec2::new(1, 0);
-    pub const UNIT_Y: Vec2 = Vec2::new(0, 1);
-    pub const ONE   : Vec2 = Vec2::new(1, 1);
+        impl $mat {
+            pub fn new($($coord: $vec),+) -> Self {
+                Self {
+                    $($coord: $coord),+
+                }
+            }
+        }
 
 
-    pub fn det(&self, other: &Self) -> i64 {
-        self.x * other.y - self.y * other.x
-    }
-}
+        impl_vector_operation!(impl Add, add from + for $mat{$vec, $($coord),+});
 
-
-impl_vector_base!(for Vec2{i64, x, y}, i64);
-impl_reinterpret_memory_as!(from (i64, i64) => Vec2);
-
-
-#[macro_export]
-macro_rules! vec2 {
-    ($x:expr, $y:expr) => {
-        Vec2::new(($x) as i64, ($y) as i64)
     };
 }
 
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Vec2f {
+pub struct Vec2 {
     pub x: f64,
     pub y: f64
 }
 
 
-impl Vec2f {
-    pub const ZERO  : Vec2f = Vec2f::new(0.0, 0.0);
-    pub const UNIT_X: Vec2f = Vec2f::new(1.0, 0.0);
-    pub const UNIT_Y: Vec2f = Vec2f::new(0.0, 1.0);
-    pub const ONE   : Vec2f = Vec2f::new(1.0, 1.0);
+impl Vec2 {
+    pub const ZERO  : Vec2 = Vec2::new(0.0, 0.0);
+    pub const UNIT_X: Vec2 = Vec2::new(1.0, 0.0);
+    pub const UNIT_Y: Vec2 = Vec2::new(0.0, 1.0);
+    pub const ONE   : Vec2 = Vec2::new(1.0, 1.0);
+
 
     pub fn det(&self, other: &Self) -> f64 {
         self.x * other.y - self.y * other.x
@@ -326,70 +333,70 @@ impl Vec2f {
 }
 
 
-impl_vector_base!(for Vec2f{f64, x, y}, f64);
-impl_reinterpret_memory_as!(from (f64, f64) => Vec2f);
-impl_vec_len!(Vec2f{f64, x, y});
+impl_vector_base!(for Vec2{f64, x, y}, f64);
+impl_reinterpret_memory_as!(from (f64, f64) => Vec2);
+
+impl_vec_len!(Vec2{f64, x, y});
 
 
 #[macro_export]
-macro_rules! vec2f {
+macro_rules! vec2 {
     ($x:expr, $y:expr) => {
-        Vec2f::new(($x) as f64, ($y) as f64)
+        Vec2::new(($x) as f64, ($y) as f64)
     };
 }
 
 
-impl_vector_cast!(Vec2{i64, x, y} <=> Vec2f{f64, x, y});
-
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct Vec3 {
+pub struct Vec2i {
     pub x: i64,
-    pub y: i64,
-    pub z: i64
+    pub y: i64
 }
 
 
-impl Vec3 {
-    pub const ZERO  : Vec3 = Vec3::new(0, 0, 0);
-    pub const UNIT_X: Vec3 = Vec3::new(1, 0, 0);
-    pub const UNIT_Y: Vec3 = Vec3::new(0, 1, 0);
-    pub const UNIT_Z: Vec3 = Vec3::new(0, 0, 1);
-    pub const ONE   : Vec3 = Vec3::new(1, 1, 1);
+impl Vec2i {
+    pub const ZERO  : Vec2i = Vec2i::new(0, 0);
+    pub const UNIT_X: Vec2i = Vec2i::new(1, 0);
+    pub const UNIT_Y: Vec2i = Vec2i::new(0, 1);
+    pub const ONE   : Vec2i = Vec2i::new(1, 1);
 
-    pub fn cross(&self, other: &Self) -> i64 {
+    pub fn det(&self, other: &Self) -> i64 {
         self.x * other.y - self.y * other.x
     }
 }
 
 
-impl_vector_base!(for Vec3{i64, x, y, z}, i64);
-impl_reinterpret_memory_as!(from (i64, i64, i64) => Vec3);
+impl_vector_base!(for Vec2i{i64, x, y}, i64);
+impl_reinterpret_memory_as!(from (i64, i64) => Vec2i);
 
 
 #[macro_export]
-macro_rules! vec3 {
-    ($x:expr, $y:expr, $z:expr) => {
-        Vec3::new(($x) as i64, ($y) as i64, ($z) as i64)
+macro_rules! vec2i {
+    ($x:expr, $y:expr) => {
+        Vec2i::new(($x) as i64, ($y) as i64)
     };
 }
 
 
+impl_vector_cast!(Vec2{f64, x, y} <=> Vec2i{i64, x, y});
+
+define_matrice_type!(Mat2{Vec2{f64, x, y}});
+
+
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Vec3f {
+pub struct Vec3 {
     pub x: f64,
     pub y: f64,
     pub z: f64
 }
 
 
-impl Vec3f {
-    pub const ZERO  : Vec3f = Vec3f::new(0.0, 0.0, 0.0);
-    pub const UNIT_X: Vec3f = Vec3f::new(1.0, 0.0, 0.0);
-    pub const UNIT_Y: Vec3f = Vec3f::new(0.0, 1.0, 0.0);
-    pub const UNIT_Z: Vec3f = Vec3f::new(0.0, 0.0, 1.0);
-    pub const ONE   : Vec3f = Vec3f::new(1.0, 1.0, 1.0);
-
+impl Vec3 {
+    pub const ZERO  : Vec3 = Vec3::new(0.0, 0.0, 0.0);
+    pub const UNIT_X: Vec3 = Vec3::new(1.0, 0.0, 0.0);
+    pub const UNIT_Y: Vec3 = Vec3::new(0.0, 1.0, 0.0);
+    pub const UNIT_Z: Vec3 = Vec3::new(0.0, 0.0, 1.0);
+    pub const ONE   : Vec3 = Vec3::new(1.0, 1.0, 1.0);
 
     pub fn cross(&self, other: &Self) -> f64 {
         self.x * other.y - self.y * other.x
@@ -397,17 +404,50 @@ impl Vec3f {
 }
 
 
-impl_vector_base!(for Vec3f{f64, x, y, z}, f64);
-impl_reinterpret_memory_as!(from (f64, f64, f64) => Vec3f);
-impl_vec_len!(Vec3f{f64, x, y, z});
+impl_vector_base!(for Vec3{f64, x, y, z}, f64);
+impl_reinterpret_memory_as!(from (f64, f64, f64) => Vec3);
+impl_vec_len!(Vec3{f64, x, y, z});
+
+#[macro_export]
+macro_rules! vec3 {
+    ($x:expr, $y:expr, $z:expr) => {
+        Vec3::new(($x) as f64, ($y) as f64, ($z) as f64)
+    };
+}
 
 
-impl_vector_cast!(Vec3{i64, x, y, z} <=> Vec3f{f64, x, y, z});
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct Vec3i {
+    pub x: i64,
+    pub y: i64,
+    pub z: i64
+}
+
+
+impl Vec3i {
+    pub const ZERO  : Vec3i = Vec3i::new(0, 0, 0);
+    pub const UNIT_X: Vec3i = Vec3i::new(1, 0, 0);
+    pub const UNIT_Y: Vec3i = Vec3i::new(0, 1, 0);
+    pub const UNIT_Z: Vec3i = Vec3i::new(0, 0, 1);
+    pub const ONE   : Vec3i = Vec3i::new(1, 1, 1);
+
+
+    pub fn cross(&self, other: &Self) -> i64 {
+        self.x * other.y - self.y * other.x
+    }
+}
+
+
+impl_vector_base!(for Vec3i{i64, x, y, z}, i64);
+impl_reinterpret_memory_as!(from (i64, i64, i64) => Vec3i);
+
+
+impl_vector_cast!(Vec3{f64, x, y, z} <=> Vec3i{i64, x, y, z});
 
 
 #[macro_export]
-macro_rules! vec3f {
+macro_rules! vec3i {
     ($x:expr, $y:expr, $z:expr) => {
-        Vec3f::new(($x) as f64, ($y) as f64, ($z) as f64)
+        Vec3i::new(($x) as i64, ($y) as i64, ($z) as i64)
     };
 }

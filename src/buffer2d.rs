@@ -1,4 +1,4 @@
-use crate::math::Vec2;
+use crate::math::Vec2i;
 
 use std::ops::{Index, IndexMut};
 
@@ -7,13 +7,13 @@ use std::ops::{Index, IndexMut};
 #[derive(Clone)]
 pub struct Buffer2D<A: Clone> {
     data: Vec<A>,
-    size: Vec2
+    size: Vec2i
 }
 
 
 
 impl<A: Clone> Buffer2D<A> {
-    pub fn new(size: Vec2, default: A) -> Self {
+    pub fn new(size: Vec2i, default: A) -> Self {
         Self {
             data: vec![default; (size.x * size.y) as usize],
             size: size
@@ -21,7 +21,7 @@ impl<A: Clone> Buffer2D<A> {
     }
 
 
-    pub fn size(&self) -> Vec2 {
+    pub fn size(&self) -> Vec2i {
         self.size
     }
 
@@ -33,7 +33,7 @@ impl<A: Clone> Buffer2D<A> {
     }
 
     /// Resizes the buffer to the new size. Positional information will be lost during the resizing process
-    pub fn raw_resize(&mut self, new_size: Vec2, default: A) {
+    pub fn raw_resize(&mut self, new_size: Vec2i, default: A) {
         self.size = new_size;
         self.data.resize((self.size.x * self.size.y) as usize, default);
         self.data.shrink_to_fit();
@@ -41,12 +41,12 @@ impl<A: Clone> Buffer2D<A> {
 
 
     // TODO: implement resize
-    pub fn resize(&mut self, new_size: Vec2, default: A) {
+    pub fn resize(&mut self, new_size: Vec2i, default: A) {
         self.raw_resize(new_size, default)
     }
 
 
-    pub fn get(&self, index: Vec2, default: A) -> A {
+    pub fn get(&self, index: Vec2i, default: A) -> A {
         if !self.is_out_of_range(index) {
             self[index].clone()
         } else {
@@ -55,16 +55,16 @@ impl<A: Clone> Buffer2D<A> {
     }
 
 
-    fn is_out_of_range(&self, p: Vec2) -> bool {
+    fn is_out_of_range(&self, p: Vec2i) -> bool {
         p.x < 0 || p.y < 0 || p.x >= self.size.x || p.y >= self.size.y
     }
 }
 
 
-impl<A: Clone> Index<Vec2> for Buffer2D<A> {
+impl<A: Clone> Index<Vec2i> for Buffer2D<A> {
     type Output = A;
 
-    fn index(&self, p: Vec2) -> &Self::Output {
+    fn index(&self, p: Vec2i) -> &Self::Output {
         if !self.is_out_of_range(p) {
             &self.data[(p.x + p.y * self.size.x) as usize]
         } else {
@@ -74,9 +74,9 @@ impl<A: Clone> Index<Vec2> for Buffer2D<A> {
 }
 
 
-impl<A: Clone> IndexMut<Vec2> for Buffer2D<A> {
+impl<A: Clone> IndexMut<Vec2i> for Buffer2D<A> {
 
-    fn index_mut(&mut self, p: Vec2) -> &mut Self::Output {
+    fn index_mut(&mut self, p: Vec2i) -> &mut Self::Output {
         if !self.is_out_of_range(p) {
             &mut self.data[(p.x + p.y * self.size.x) as usize]
         } else {

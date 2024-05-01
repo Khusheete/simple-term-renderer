@@ -1,6 +1,6 @@
 use crate::buffer2d::Buffer2D;
 use crate::img::{Color, Image};
-use crate::math::Vec2;
+use crate::math::Vec2i;
 
 use std::cmp;
 
@@ -49,7 +49,7 @@ impl ScreeBuffer {
 
 
     pub fn new<V>(size: V) -> Self
-        where V: AsRef<Vec2>
+        where V: AsRef<Vec2i>
     {
         let mut text_size = *size.as_ref();
         text_size.y /= 2;
@@ -66,14 +66,14 @@ impl ScreeBuffer {
 
 
     pub fn get_color<V>(&self, pos: V) -> Color
-        where V: AsRef<Vec2>
+        where V: AsRef<Vec2i>
     {
         self.image[pos]
     }
 
 
     pub fn raw_resize<V>(&mut self, new_size: V) 
-        where V: AsRef<Vec2>
+        where V: AsRef<Vec2i>
     {
         let mut text_size = *new_size.as_ref();
         text_size.y /= 2;
@@ -83,62 +83,62 @@ impl ScreeBuffer {
 
 
     pub fn point<V>(&mut self, p: V, c: Color)
-        where V: AsRef<Vec2>
+        where V: AsRef<Vec2i>
     {
         self.image[p] = c;
     }
 
 
     pub fn line<V1, V2>(&mut self, p1: V1, p2: V2, c: Color)
-        where V1: AsRef<Vec2>, V2: AsRef<Vec2>
+        where V1: AsRef<Vec2i>, V2: AsRef<Vec2i>
     {
         self.image.line(p1, p2, c);
     }
 
 
     pub fn rect_boudary<V1, V2>(&mut self, p: V1, s: V2, c: Color)
-        where V1: AsRef<Vec2>, V2: AsRef<Vec2>
+        where V1: AsRef<Vec2i>, V2: AsRef<Vec2i>
     {
         self.image.rect_boudary(p, s, c);
     }
 
 
     pub fn rect<V1, V2>(&mut self, p: V1, s: V2, c: Color) 
-        where V1: AsRef<Vec2>, V2: AsRef<Vec2>
+        where V1: AsRef<Vec2i>, V2: AsRef<Vec2i>
     {
         self.image.rect(p, s, c);
     }
 
 
     pub fn ellipse_boundary<V1, V2>(&mut self, center: V1, size: V2, c: Color) 
-        where V1: AsRef<Vec2>, V2: AsRef<Vec2>
+        where V1: AsRef<Vec2i>, V2: AsRef<Vec2i>
     {
         self.image.ellipse_boundary(center, size, c);
     }
 
 
     pub fn image<V1, V2, V3>(&mut self, img: &Image, pos: V1, size: V2, offset: V3, alpha: Option<Color>) 
-        where V1: AsRef<Vec2>, V2: AsRef<Vec2>, V3: AsRef<Vec2>
+        where V1: AsRef<Vec2i>, V2: AsRef<Vec2i>, V3: AsRef<Vec2i>
     {
         self.image.image(img, pos, size, offset, alpha);
     }
 
 
     pub fn whole_image_alpha<V>(&mut self, img: &Image, pos: V, alpha: Color) 
-        where V: AsRef<Vec2>
+        where V: AsRef<Vec2i>
     {
         self.image.whole_image_alpha(img, pos, alpha);
     }
 
 
     pub fn whole_image<V>(&mut self, img: &Image, pos: V) 
-        where V: AsRef<Vec2>
+        where V: AsRef<Vec2i>
     {
         self.image.whole_image(img, pos);
     }
 
 
-    pub fn size(&self) -> Vec2 {
+    pub fn size(&self) -> Vec2i {
         self.image.size()
     }
 
@@ -149,9 +149,9 @@ impl ScreeBuffer {
 
 
     pub fn print_text_raw<V>(&mut self, text: String, pos: V, backgroud_mode: CharBackgroundMode, foreground_mode: CharForegroundMode)
-        where V: AsRef<Vec2>
+        where V: AsRef<Vec2i>
     {
-        let mut pos: Vec2 = *pos.as_ref();
+        let mut pos: Vec2i = *pos.as_ref();
         
         // Skip if the text goes offscreen in the y direction
         // the x direction cannot be skipped because the text may enter the screen again
@@ -168,7 +168,7 @@ impl ScreeBuffer {
         
         for (i, c) in char_iter {
             let x = pos.x + (i as i64);
-            let char_pos = vec2!(x, pos.y);
+            let char_pos = vec2i!(x, pos.y);
 
             if x < 0 {
                 continue
@@ -187,7 +187,7 @@ impl ScreeBuffer {
 
 
     pub fn get_char_data<V>(&self, pos: V) -> CharData
-        where V: AsRef<Vec2>
+        where V: AsRef<Vec2i>
     {
         let mut pos = *pos.as_ref();
         pos.y /= 2;

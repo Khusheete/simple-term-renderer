@@ -135,7 +135,7 @@ mod tests {
             // draw on screen
             rdr.begin_draw();
             rdr.clear_color(Color::BLACK);
-            rdr.draw_rect_boundary(Vec2::ZERO, size - vec2!(1, 1), Color::BROWN);
+            rdr.draw_rect_boundary(Vec2i::ZERO, size - vec2i!(1, 1), Color::BROWN);
             rdr.draw_point(pos, Color::WHITE);
             rdr.end_draw();
 
@@ -152,8 +152,8 @@ mod tests {
         let dynamic_text = String::from("Some dynamic text !!!");
         let dyn_text_char_count = dynamic_text.chars().count();
 
-        let mut dyn_text_pos: Vec2f = Vec2f::ZERO;
-        let mut dyn_text_speed: Vec2f = Vec2f::new(TAU * 10.0, 17.0);
+        let mut dyn_text_pos: Vec2 = Vec2::ZERO;
+        let mut dyn_text_speed: Vec2 = Vec2::new(TAU * 10.0, 17.0);
 
         let mut instant = Instant::now();
         let max_frame_rate: f64 = 60.0;
@@ -184,7 +184,7 @@ mod tests {
             };
 
             // Update text values
-            let size = Vec2f::from(Renderer::get_size());
+            let size = Vec2::from(Renderer::get_size());
             dyn_text_pos += dyn_text_speed * delta;
             if dyn_text_pos.x <= 1.0 {
                 dyn_text_speed.x = dyn_text_speed.x.abs();
@@ -227,7 +227,7 @@ mod tests {
             rdr.print_blended_text_raw(&String::from("I can draw text that will automagically change color to be readable"), (0, 4));
 
             rdr.draw_rect((20, 20), (49, 7), Color::DARK_RED);
-            rdr.print_blended_text_raw(&dynamic_text, Vec2::from(dyn_text_pos));
+            rdr.print_blended_text_raw(&dynamic_text, Vec2i::from(dyn_text_pos));
             rdr.end_draw();
         }
     }

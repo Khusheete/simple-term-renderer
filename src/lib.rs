@@ -100,16 +100,16 @@ mod tests {
     #[test]
     fn input() {
         let rdr = Renderer::get();
-        let inp = Input::get();
         Input::enable_mouse();
 
         let mut pos = Renderer::get_size() / 2;
 
         loop {
             let size = Renderer::get_size();
+            eprintln!("Size gotten");
 
             // manage input
-            match inp.get_event() {
+            match Input::get().get_event() {
                 Some(event) => {
                     match event {
                     InputEvent::Key(event) => match event {
@@ -130,6 +130,7 @@ mod tests {
                 }
                 None => ()
             };
+            eprint!("Input processed");
 
             // draw on screen
             rdr.begin_draw();
@@ -137,6 +138,8 @@ mod tests {
             rdr.draw_rect_boundary(Vec2::ZERO, size - vec2!(1, 1), Color::BROWN);
             rdr.draw_point(pos, Color::WHITE);
             rdr.end_draw();
+
+            eprintln!("Frame drawn")
         }
     }
 

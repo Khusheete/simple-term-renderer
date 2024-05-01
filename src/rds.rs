@@ -41,11 +41,15 @@ use std::io::{stdout, Write};
 use std::panic;
 use std::backtrace::Backtrace;
 
+use std::ptr;
 use std::thread;
-use std::sync::{mpsc, Barrier, Arc, Mutex};
+use std::sync::{mpsc, Arc, Barrier, Mutex};
 
 use std::io::stdin;
 use std::os::unix::io::AsRawFd;
+
+use std::alloc::{alloc, Layout};
+
 
 const NCCS: usize = 32;
 
@@ -118,12 +122,12 @@ pub struct Renderer {
 
 
 /// Renderer singleton
-static mut RENDERER: Option<Renderer> = None;
+static mut RENDERING_SERVER: *mut Renderer = ptr::null_mut();
 
 
 impl Renderer {
 
-    /// Creates the Input singleton, will only be called once
+    /// Creates the Renderer singleton, will only be called once
     fn init() -> Renderer {
         let stdinfd = stdin().as_raw_fd();
 
@@ -326,7 +330,7 @@ impl Renderer {
     /// Exits the program and reset terminal setttings (should be called before the program ends).
     pub fn exit() {
         unsafe {
-            RENDERER = None;
+            RENDERING_SERVER.drop_in_place()
         }
     }
 
@@ -334,13 +338,13 @@ impl Renderer {
     /// Returns the Renderer instance.
     pub fn get() -> &'static mut Renderer {
         unsafe {
-            match &mut RENDERER {
-                None => { // construct the renderer, and initialize
-                    RENDERER = Some(Renderer::init());
-                    Renderer::get()
-                }
-                Some(r) => r
+            // Init once
+            if RENDERING_SERVER.is_null() {
+                RENDERING_SERVER = alloc(Layout::new::<*mut Renderer>()) as *mut Renderer;
+                RENDERING_SERVER.write(Renderer::init());
             }
+
+            &mut *RENDERING_SERVER
         }
     }
 
@@ -356,7 +360,7 @@ impl Renderer {
         unsafe {
             let mut size: TermSize = mem::zeroed();
             libc::ioctl(libc::STDOUT_FILENO, libc::TIOCGWINSZ, &mut size as *mut _);
-            vec2!(size.col as i64, 2 * size.row as i64)
+            vec2!(size.col as i32, 2 * size.row as i32)
         }
     }
 

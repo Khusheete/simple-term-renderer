@@ -27,14 +27,15 @@
 // HEAVELY inspired by the termion library
 
 
+use std::cell::OnceCell;
 use std::io::{Error, ErrorKind};
 use std::str;
+use std::sync::mpsc;
 
 // use std::{fs, io};
 use std::io::{Read, Write, stdin, stdout};
 
 use std::thread;
-use std::sync::mpsc;
 
 use crate::math::Vec2;
 
@@ -346,7 +347,7 @@ fn parse_utf8_char<I>(c: u8, iter: &mut I) -> Result<char, Error>
 
 
 /// Input Server Singleton instance
-static mut INPUT_SERVER: Option<Input> = None;
+static mut INPUT_SERVER: OnceCell<Input> = OnceCell::new();
 
 
 /// The Input is a singleton that handles async io operations
@@ -412,28 +413,22 @@ impl Input {
     /// Returns the Input singleton.
     /// If no call to Input::get() is made, the server never starts;
     /// this can be usefull when custom input handling is needed.
-    pub fn get() -> &'static mut Input {
+    pub fn get() -> &'static Input {
         unsafe {
-            match &mut INPUT_SERVER {
-                None => {
-                    INPUT_SERVER = Some(Input::init());
-                    Input::get()
-                },
-                Some(i) => i
-            }
+            INPUT_SERVER.get_or_init(|| { Self::init() })
         }
     }
 
 
     /// If there was an event, return it.
     /// Never blocks the current thread.
-    pub fn get_event(&mut self) -> Option<InputEvent> {
+    pub fn get_event(&self) -> Option<InputEvent> {
         self.input_recv.try_recv().ok()
     }
 
 
     /// Wait for an InputEvent to occur and return it.
-    pub fn get_event_blocking(&mut self) -> InputEvent {
+    pub fn get_event_blocking(&self) -> InputEvent {
         self.input_recv.recv().ok().expect("Input thread was killed")
     }
 

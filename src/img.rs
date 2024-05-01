@@ -31,6 +31,7 @@ use crate::math::{Vec2, Vec3f};
 use std::ops::{Index, IndexMut};
 use std::fmt;
 use std::path::Path;
+use std::ptr::addr_of_mut;
 
 
 use image::io::Reader as ImageReader;
@@ -653,7 +654,7 @@ impl<A: AsRef<Vec2>> IndexMut<A> for Image {
         if !self.is_out_of_range(p) {
             &mut self.data[p]
         } else {
-            unsafe { &mut TEMP } // NOT GOOD, ignore index out of range
+            unsafe { addr_of_mut!(TEMP).as_mut().unwrap() } // NOT GOOD, ignore index out of range
         }
     }
 }

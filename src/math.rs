@@ -290,11 +290,88 @@ macro_rules! impl_vec_len {
 }
 
 
-macro_rules! define_matrice_type {
+macro_rules! _mat_mult_elem {
+    ($a:ident{$($c1a:ident),+}.$c1b:ident, $b:ident.$c2:ident) => {
+        sum!(
+            $($a.$c1a.$c1b * $b.$c2.$c1a),+
+        )
+    };
+}
+
+
+macro_rules! _mat_mult_line {
+    ($a:ident $c1as:tt . {$($c1b:ident),+}, $b:ident.$c2:ident, $vec:ty) => {
+        <$vec>::new($(
+            _mat_mult_elem!($a$c1as.$c1b, $b.$c2)
+        ),+)
+    };
+}
+
+macro_rules! _mat_mult_expression {
+    ($a:ident $coord1:tt, $b:ident{$($coord2:ident),+}, $vec:ty) => {
+        Self::new($(_mat_mult_line!(
+            $a $coord1 . $coord1, $b.$coord2, $vec
+        )),+)
+    };
+}
+
+
+macro_rules! impl_mat_mult {
+    ($mat:ident{$vec:ty{$t:ty, $($coord:ident),+}}) => {
+
+        impl Mul for $mat {
+            type Output = Self;
+
+            fn mul(self, other: Self) -> Self::Output {
+                _mat_mult_expression!(
+                    self{$($coord),+},
+                    other{$($coord),+},
+                    $vec
+                )
+            }
+        }
+    };
+}
+
+
+macro_rules! _mat_vec_mult_line {
+    ($mat:ident {$($c1:ident),+}.$c2:ident, $v:ident) => {
+        sum!($(
+            $mat.$c1.$c2 * $v.$c1
+        ),+)
+    };
+}
+
+
+macro_rules! _mat_vec_mult_expression {
+    ($mat:ident $c1s:tt . {$($c2:ident),+}, $v:ident, $vec:ty) => {
+        <$vec>::new($(
+            _mat_vec_mult_line!($mat $c1s.$c2, $v)
+        ),+)
+    };
+}
+
+
+macro_rules! impl_mat_vec_mult {
+    ($mat:ident{$vec:ty{$t:ty, $($coord:ident),+}}) => {
+        
+        impl Mul<$vec> for $mat {
+            type Output = $vec;
+
+            fn mul(self, other: $vec) -> Self::Output {
+                    _mat_vec_mult_expression!(self {$($coord),+}.{$($coord),+}, other, $vec)
+            }
+        }
+    };
+}
+
+
+macro_rules! define_matrix_type {
     ($mat:ident{$vec:ty{$t:ty, $($coord:ident),+}}) => {
         // Definition
+        #[derive(Debug, Clone, Copy, PartialEq)]
         pub struct $mat {
-            $($coord: $vec),+
+            $(pub $coord: $vec),+
         }
 
 
@@ -306,9 +383,40 @@ macro_rules! define_matrice_type {
             }
         }
 
-
+        // Matrix addition
         impl_vector_operation!(impl Add, add from + for $mat{$vec, $($coord),+});
+        forward_ref_binop!(impl Add, add for $mat, $mat);
+        forward_assign_binop!(impl AddAssign, add_assign from add for $mat, $mat);
 
+        // Matrix subtraction
+        impl_vector_operation!(impl Sub, sub from + for $mat{$vec, $($coord),+});
+        forward_ref_binop!(impl Sub, sub for $mat, $mat);
+        forward_assign_binop!(impl SubAssign, sub_assign from sub for $mat, $mat);
+
+        // Matrix multiplication
+        impl_mat_mult!($mat{$vec{$t, $($coord),+}});
+        forward_ref_binop!(impl Mul, mul for $mat, $mat);
+        forward_assign_binop!(impl MulAssign, mul_assign from mul for $mat, $mat);
+
+        // Matrix vector multiplication
+        impl_mat_vec_mult!($mat{$vec{$t, $($coord),+}});
+        forward_ref_binop!(impl Mul, mul for $mat, $vec);
+
+        // Scalar multiplication
+        impl_scalar_operation!(right impl Mul, mul from * for $mat{$vec, $($coord),+}, $t);
+        forward_ref_binop!(impl Mul, mul for $mat, $t);
+        forward_assign_binop!(impl MulAssign, mul_assign from mul for $mat, $t);
+
+        impl_scalar_operation!(left impl Mul, mul from * for $t, $mat{$vec, $($coord),+});
+        forward_ref_binop!(impl Mul, mul for $t, $mat);
+
+        // Scalar division
+        impl_scalar_operation!(right impl Div, div from / for $mat{$vec, $($coord),+}, $t);
+        forward_ref_binop!(impl Div, div for $mat, $t);
+        forward_assign_binop!(impl DivAssign, div_assign from div for $mat, $t);
+
+        // Negation
+        impl_vec_neg!($mat{$vec, $($coord),+});
     };
 }
 
@@ -380,7 +488,7 @@ macro_rules! vec2i {
 
 impl_vector_cast!(Vec2{f64, x, y} <=> Vec2i{i64, x, y});
 
-define_matrice_type!(Mat2{Vec2{f64, x, y}});
+define_matrix_type!(Mat2{Vec2{f64, x, y}});
 
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -398,8 +506,12 @@ impl Vec3 {
     pub const UNIT_Z: Vec3 = Vec3::new(0.0, 0.0, 1.0);
     pub const ONE   : Vec3 = Vec3::new(1.0, 1.0, 1.0);
 
-    pub fn cross(&self, other: &Self) -> f64 {
-        self.x * other.y - self.y * other.x
+    pub fn cross(&self, other: Self) -> Vec3 {
+        Vec3::new(
+              self.y * other.z - self.z * other.y,
+            -(self.x * other.z - self.z * other.x),
+              self.x * other.y - self.y * other.x
+        )
     }
 }
 
@@ -414,6 +526,8 @@ macro_rules! vec3 {
         Vec3::new(($x) as f64, ($y) as f64, ($z) as f64)
     };
 }
+
+define_matrix_type!(Mat3{Vec3{f64, x, y, z}});
 
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -432,8 +546,12 @@ impl Vec3i {
     pub const ONE   : Vec3i = Vec3i::new(1, 1, 1);
 
 
-    pub fn cross(&self, other: &Self) -> i64 {
-        self.x * other.y - self.y * other.x
+    pub fn cross(&self, other: Self) -> Vec3i {
+        Vec3i::new(
+            self.y * other.z - self.z * other.y,
+          -(self.x * other.z - self.z * other.x),
+            self.x * other.y - self.z * other.x
+      )
     }
 }
 
